@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Volleyball Tournament Hub</title>
+    <!-- Standard way to link your CSS file -->
+    <link rel="stylesheet" href="css/style.css">
+  </head>
+  <body>
+    <header class="navbar">
+      <div class="nav-top">
+        <h1>Tournament Hub</h1>
+        <a href="#" class="admin-btn" target="_blank">Admin</a>
+      </div>
+      
+      <nav class="nav-tabs">
+        <button class="nav-btn" id="btn-infoView" onclick="switchView('infoView')">Info</button>
+        <button class="nav-btn active" id="btn-poolsView" onclick="switchView('poolsView')">Pools</button>
+        <button class="nav-btn" id="btn-bracketsView" onclick="switchView('bracketsView')">Brackets</button>
+        <button class="nav-btn" id="btn-teamView" onclick="switchView('teamView')">My Team</button>
+      </nav>
+    </header>
+
+    <main id="app-container">
+      
+      <div id="poolsView" class="view-section active">
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px; margin-top: 5px;">
+          <h2 style="font-size: 1.2rem; color: var(--text-primary); margin: 0;">Pool Standings</h2>
+          <div style="text-align: right;">
+            <label style="font-size: 0.75rem; color: var(--text-secondary);">Site Location:</label><br>
+            <select id="publicSiteFilter" onchange="loadPoolData()" style="background: var(--surface-lighter); color: var(--text-primary); border: 1px solid var(--border-color); padding: 4px 8px; border-radius: 4px; margin-top: 4px;">
+              <option value="All">All Sites</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="publicPoolsList" class="pools-grid">
+          <p style="color: var(--text-secondary);">Loading pools...</p>
+        </div>
+      </div>
+
+      <div id="bracketsView" class="view-section">
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px; margin-top: 5px;">
+          <h2 style="font-size: 1.2rem; color: var(--text-primary); margin: 0;">Brackets</h2>
+          <div style="text-align: right;">
+            <select id="publicBracketFilter" onchange="loadBracketData()" style="background: var(--surface-lighter); color: var(--text-primary); border: 1px solid var(--border-color); padding: 4px 8px; border-radius: 4px;">
+              <option value="Gold">Gold Division</option>
+              <option value="Silver">Silver Division</option>
+            </select>
+          </div>
+        </div>
+        <div id="bracket-window" class="bracket-window">
+            <div id="bracket-canvas" class="bracket-canvas"></div>
+        </div>
+      </div>
+
+      <div id="teamView" class="view-section">
+        <h2 style="font-size: 1.2rem; color: var(--text-primary); margin: 5px 0 15px 0;">Find Your Team</h2>
+        <select id="myTeamSelect" onchange="renderMyTeam()" style="width: 100%; background: var(--surface-lighter); color: var(--text-primary); border: 1px solid var(--border-color); padding: 10px; border-radius: 6px; font-size: 1rem; margin-bottom: 20px;">
+           <option value="">-- Select a Team --</option>
+        </select>
+        
+        <div id="myTeamContent">
+        </div>
+      </div>
+
+      <div id="infoView" class="view-section" style="display: none; padding-bottom: 30px;">
+        <h2 style="font-size: 1.2rem; color: var(--text-primary); margin: 5px 0 15px 0;">2026 West Coast Challenge Info</h2>
+
+        <div style="background: var(--surface-dark); border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 15px; overflow: hidden;">
+          <div style="background: rgba(255, 255, 255, 0.04); border-bottom: 1px solid var(--border-color); border-top: 4px solid var(--accent-orange); padding: 12px 15px;">
+            <h3 style="color: var(--text-primary); margin: 0; font-size: 1.1rem;">📍 Locations & Schedule</h3>
+          </div>
+          <div style="padding: 15px;">
+            <h4 style="color: var(--text-primary); margin: 0 0 5px 0; font-size: 0.95rem;">Friday, August 21, 2026 - Pool Play</h4>
+            <ul style="color: var(--text-secondary); font-size: 0.9rem; margin: 0 0 15px 0; padding-left: 20px; line-height: 1.5;">
+              <li><strong>Valhalla HS</strong> (1725 Hillsdale Rd, El Cajon): Gym opens at 3:15 PM. Play at 4:00 PM.</li>
+              <li><strong>Granite Hills HS</strong> (1719 E Madison Ave, El Cajon): Gym opens at 3:45 PM. Play at 4:30 PM.</li>
+              <li><em>It is imperative that all teams are ready to play/ref on time. The next match starts immediately as the previous match ends.</em></li>
+            </ul>
+
+            <h4 style="color: var(--text-primary); margin: 0 0 5px 0; font-size: 0.95rem;">Saturday, August 22, 2026 - Playoffs</h4>
+            <ul style="color: var(--text-secondary); font-size: 0.9rem; margin: 0; padding-left: 20px; line-height: 1.5;">
+              <li><strong>All Gyms</strong> will be ready to open at 8:15 AM. Play begins at 9:00 AM.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div style="background: var(--surface-dark); border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 15px; overflow: hidden;">
+          <div style="background: rgba(255, 255, 255, 0.04); border-bottom: 1px solid var(--border-color); border-top: 4px solid var(--accent-orange); padding: 12px 15px;">
+            <h3 style="color: var(--text-primary); margin: 0; font-size: 1.1rem;">🎟️ Admission & Concessions</h3>
+          </div>
+          <div style="padding: 15px;">
+            <ul style="color: var(--text-secondary); font-size: 0.9rem; margin: 0; padding-left: 20px; line-height: 1.5;">
+              <li><strong>Spectator Entry Fee:</strong> $10 for Adults, $5 for Senior Citizens. Students/Kids are FREE. (Charged each day).</li>
+              <li><strong>Payment:</strong> Please ask your parents to bring <strong>cash</strong>.</li>
+              <li><strong>Snack Bar:</strong> Available at all sites (cash preferred).</li>
+            </ul>
+          </div>
+        </div>
+
+        <div style="background: var(--surface-dark); border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 15px; overflow: hidden;">
+          <div style="background: rgba(255, 255, 255, 0.04); border-bottom: 1px solid var(--border-color); border-top: 4px solid var(--accent-orange); padding: 12px 15px;">
+            <h3 style="color: var(--text-primary); margin: 0; font-size: 1.1rem;">⛺ Team Camps & Facilities</h3>
+          </div>
+          <div style="padding: 15px;">
+            <ul style="color: var(--text-secondary); font-size: 0.9rem; margin: 0; padding-left: 20px; line-height: 1.5;">
+              <li>You can set up a camp outside to hang out. Feel free to bring food.</li>
+              <li><strong style="color: #ff6b7e;">NO Grills or cooking</strong> will be allowed.</li>
+              <li>Please help make sure to clean up your campsite after your team is done playing!</li>
+            </ul>
+          </div>
+        </div>
+
+        <div style="background: var(--surface-dark); border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 15px; overflow: hidden;">
+          <div style="background: rgba(255, 255, 255, 0.04); border-bottom: 1px solid var(--border-color); border-top: 4px solid var(--accent-orange); padding: 12px 15px;">
+            <h3 style="color: var(--text-primary); margin: 0; font-size: 1.1rem;">🏐 Match Format & Rules</h3>
+          </div>
+          <div style="padding: 15px;">
+            <ul style="color: var(--text-secondary); font-size: 0.9rem; margin: 0 0 15px 0; padding-left: 20px; line-height: 1.5;">
+              <li>Please <strong>bring your own balls</strong> for warm-ups.</li>
+              <li>There will be <strong>NO "shared" hitting or serving</strong> at any time.</li>
+              <li><strong>Warm-ups:</strong> 6 minutes before your 1st match of the day; 4 minutes for all subsequent matches.</li>
+              <li><strong>Scoring:</strong> ALL matches are best of three. First two sets are rally-scored to 25. Third set (if required) is rally to 15. <strong>No cap on any sets.</strong></li>
+            </ul>
+            <div style="background: rgba(255, 255, 255, 0.03); border-left: 3px solid var(--accent-orange); padding: 10px; border-radius: 4px;">
+              <strong style="color: var(--text-primary); font-size: 0.9rem;">Tie-Breaker Rules:</strong><br>
+              <span style="font-size: 0.85rem; color: var(--text-secondary);">
+                • <strong>Two-way ties:</strong> broken by head-to-head.<br>
+                • <strong>Three-way ties:</strong> broken via set ratio, then point ratio (head-to-head is not a factor).
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div style="background: var(--surface-dark); border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 15px; overflow: hidden;">
+          <div style="background: rgba(255, 255, 255, 0.04); border-bottom: 1px solid var(--border-color); border-top: 4px solid var(--accent-orange); padding: 12px 15px;">
+            <h3 style="color: var(--text-primary); margin: 0; font-size: 1.1rem;">🏆 Saturday Playoff Breakdown</h3>
+          </div>
+          <div style="padding: 15px;">
+            <ul style="color: var(--text-secondary); font-size: 0.9rem; margin: 0; padding-left: 20px; line-height: 1.5;">
+              <li><strong>1st & 2nd Place</strong> from Friday pools compete in the <strong>GOLD</strong> division at Valhalla HS.</li>
+              <li><strong>3rd & 4th Place</strong> from Friday pools compete in the <strong>SILVER</strong> division at Granite Hills HS.</li>
+              <li>First-round playoff matches on Saturday are for <strong>SEEDING ONLY</strong>. Single elimination begins after the seeding round!</li>
+            </ul>
+          </div>
+        </div>
+
+        <div style="background: var(--surface-dark); border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 15px; overflow: hidden;">
+          <div style="background: rgba(255, 255, 255, 0.04); border-bottom: 1px solid var(--border-color); border-top: 4px solid var(--accent-orange); padding: 12px 15px;">
+            <h3 style="color: var(--text-primary); margin: 0; font-size: 1.1rem;">📊 Tournament Seeding</h3>
+          </div>
+          <div style="padding: 15px;">
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0; line-height: 1.5;">
+              Seeding was done by CIF Divisions as there were no matches to evaluate at this time. After that, we had to consider teams from the same league and other conflicts to set the initial pools.
+            </p>
+          </div>
+        </div>
+
+        <div style="background: var(--surface-dark); border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 15px; overflow: hidden;">
+          <div style="background: rgba(255, 255, 255, 0.04); border-bottom: 1px solid var(--border-color); border-top: 4px solid #BF2A39; padding: 12px 15px;">
+            <h3 style="color: var(--text-primary); margin: 0; font-size: 1.1rem;">⚖️ Officiating Duties</h3>
+          </div>
+          <div style="padding: 15px;">
+            <ul style="color: var(--text-secondary); font-size: 0.9rem; margin: 0 0 15px 0; padding-left: 20px; line-height: 1.5;">
+              <li>Please be ready to officiate when it is your turn, but we will try to provide a scorebook person.</li>
+              <li><strong>Friday:</strong> Sitting teams may be asked to help line/score during pool play.</li>
+              <li><strong>Saturday:</strong> Teams will be asked to officiate or assist in officiating the first round of matches.</li>
+            </ul>
+            <div style="background: rgba(191, 42, 57, 0.08); border: 1px solid rgba(191, 42, 57, 0.3); color: #ff6b7e; padding: 10px; border-radius: 4px; text-align: center; font-weight: bold; font-size: 0.85rem;">
+              🚨 LOSING TEAMS WILL BE ASKED TO STAY AND OFFICIATE MATCHES ON SATURDAY!
+            </div>
+          </div>
+        </div>
+
+        <p style="text-align: center; color: var(--accent-orange); font-size: 1.1rem; font-weight: bold; margin: 25px 0;">
+          Come ready to play some volleyball and have some fun!
+        </p>
+
+        <div style="background: var(--surface-dark); border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 15px; overflow: hidden;">
+          <div style="background: rgba(255, 255, 255, 0.04); border-bottom: 1px solid var(--border-color); border-top: 4px solid var(--accent-orange); padding: 12px 15px;">
+            <h3 style="color: var(--text-primary); margin: 0; font-size: 1.1rem; text-align: center;">📞 Tournament Director</h3>
+          </div>
+          <div style="padding: 15px; text-align: center;">
+            <h4 style="color: var(--text-primary); margin: 0 0 5px 0; font-size: 1.05rem;">Doug Babington</h4>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0 0 5px 0;">
+              📧 <a href="mailto:valhallavb@yahoo.com" style="color: var(--accent-orange); text-decoration: none;">valhallavb@yahoo.com</a>
+            </p>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;">
+              📱 619-368-0304
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+
+    <!-- Standard way to link your JS file. 
+         Using type="module" allows us to import your uiMath.js file! -->
+    <script type="module" src="js/app.js"></script>
+
+    <!-- Score Entry Modal -->
+    <div id="scoreModal" class="modal-overlay" style="display: none;">
+      <div class="modal-card">
+        <h3 id="modalMatchTitle">Enter Scores</h3>
+        <p id="modalMatchTeams" class="modal-subtitle"></p>
+        
+        <input type="hidden" id="modalMatchId" />
+
+        <div class="score-grid">
+          <div class="score-header">Set</div>
+          <div id="modalTeamAName" class="score-header">Team A</div>
+          <div id="modalTeamBName" class="score-header">Team B</div>
+
+          <div>Set 1</div>
+          <div><input type="number" id="modalS1A" min="0" max="99" /></div>
+          <div><input type="number" id="modalS1B" min="0" max="99" /></div>
+
+          <div>Set 2</div>
+          <div><input type="number" id="modalS2A" min="0" max="99" /></div>
+          <div><input type="number" id="modalS2B" min="0" max="99" /></div>
+
+          <div>Set 3</div>
+          <div><input type="number" id="modalS3A" min="0" max="99" /></div>
+          <div><input type="number" id="modalS3B" min="0" max="99" /></div>
+        </div>
+
+        <div class="status-selector">
+          <label for="modalStatus">Match Status:</label>
+          <select id="modalStatus">
+            <option value="In Progress">In Progress</option>
+            <option value="Complete" selected>Complete</option>
+          </select>
+        </div>
+
+        <div class="modal-actions">
+          <button id="cancelModalBtn" onclick="closeScoreModal()">Cancel</button>
+          <button id="saveScoreBtn" onclick="submitScoreUpdate()">Save Score</button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
