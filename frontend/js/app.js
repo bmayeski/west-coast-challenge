@@ -5,6 +5,8 @@ import { initBracketPanZoom, renderBracket } from './uiBracket.js';
 import { populateTeamDropdown, renderMyTeam } from './uiTeam.js';
 import { getStandingsData, getBracketData } from './uiMath.js';
 import { renderPools } from './uiPools.js';
+import { attemptAdminLogin, closeAdminLogin, submitAdminLogin, logoutAdmin, switchAdminSubView, adminAddPool, adminAddTeam } from './uiAdmin.js';
+
 
 // --- 2. GLOBAL STATE ---
 export let globalStandings = null;
@@ -58,6 +60,13 @@ window.submitScoreUpdate = () => submitScoreUpdate(silentRefresh);
 window.loadPoolData = () => silentRefresh();
 window.loadBracketData = () => silentRefresh();
 window.renderMyTeam = () => renderMyTeam();
+window.attemptAdminLogin = attemptAdminLogin;
+window.closeAdminLogin = closeAdminLogin;
+window.submitAdminLogin = submitAdminLogin;
+window.logoutAdmin = logoutAdmin;
+window.switchAdminSubView = switchAdminSubView;
+window.adminAddPool = adminAddPool;
+window.adminAddTeam = adminAddTeam;
 
 // --- 5. SILENT POLLER & UI REFRESH ---
 export async function silentRefresh() {
