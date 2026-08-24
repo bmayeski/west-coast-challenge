@@ -44,17 +44,20 @@ export function renderMyTeam() {
     let displayColor = lightenColor(myTeam.color, 0.4); 
     const logoHTML = myTeam.logoId ? `<img src="https://lh3.googleusercontent.com/d/${myTeam.logoId}" style="width: 50px; height: 50px; object-fit: contain;">` : '';
 
-    // NEW: Calculate bracket stats dynamically
     let bracketWins = 0; let bracketLosses = 0;
     let bracketSetsWon = 0; let bracketSetsLost = 0;
     let bracketMatches = [];
+    let playedBracketMatches = []; // Excludes matches where they only reffed
 
     [...(globalBracketsGold?.matches || []), ...(globalBracketsSilver?.matches || [])].forEach(m => {
         if (m && (m.teamA === myTeam.name || m.teamB === myTeam.name || m.ref === myTeam.name)) {
             bracketMatches.push(m);
             
+            if (m.teamA === myTeam.name || m.teamB === myTeam.name) {
+                playedBracketMatches.push(m);
+            }
+            
             let isComplete = m.status === 'Complete' || m.status === 'Final';
-            // Only tally stats if myTeam is actually playing (not just reffing)
             if (isComplete && (m.teamA === myTeam.name || m.teamB === myTeam.name)) {
                 let setsA = 0; let setsB = 0;
                 if (m.s1A !== "" && m.s1B !== "") { parseInt(m.s1A) > parseInt(m.s1B) ? setsA++ : setsB++; }
@@ -72,7 +75,59 @@ export function renderMyTeam() {
         }
     });
 
-    // UPDATED: Two side-by-side mini dashboards for Pool Play and Playoffs
+    // --- Calculate Pool Placement ---
+    let poolFinishText = '';
+    if (myTeam.place) {
+        let ordinal = myTeam.place === 1 ? 'st' : myTeam.place === 2 ? 'nd' : myTeam.place === 3 ? 'rd' : 'th';
+        poolFinishText = `${myTeam.place}${ordinal} Place`;
+    }
+
+    // --- Calculate Smart Bracket Placement ---
+    let division = "";
+    if (globalBracketsGold?.matches?.some(m => m.teamA === myTeam.name || m.teamB === myTeam.name)) division = "Gold";
+    else if (globalBracketsSilver?.matches?.some(m => m.teamA === myTeam.name || m.teamB === myTeam.name)) division = "Silver";
+    
+    let playoffFinishText = division ? `${division} Bracket` : "TBD";
+    
+    if (division && playedBracketMatches.length > 0) {
+        const depthMap = { 'Seeding': 1, 'Quarterfinals': 2, 'Semifinals': 3, 'Finals': 4 };
+        let maxDepth = 0;
+        let deepestMatch = null;
+        
+        playedBracketMatches.forEach(m => {
+            let depth = depthMap[m.type] || 0;
+            if (depth > maxDepth) {
+                maxDepth = depth;
+                deepestMatch = m;
+            }
+        });
+
+        if (deepestMatch) {
+            let isComplete = deepestMatch.status === 'Complete' || deepestMatch.status === 'Final';
+            
+            if (!isComplete) {
+                playoffFinishText = `In ${division} ${deepestMatch.type}`;
+            } else {
+                let setsA = 0; let setsB = 0;
+                if (deepestMatch.s1A !== "" && deepestMatch.s1B !== "") { parseInt(deepestMatch.s1A) > parseInt(deepestMatch.s1B) ? setsA++ : setsB++; }
+                if (deepestMatch.s2A !== "" && deepestMatch.s2B !== "") { parseInt(deepestMatch.s2A) > parseInt(deepestMatch.s2B) ? setsA++ : setsB++; }
+                if (setsA < 2 && setsB < 2 && deepestMatch.s3A !== "" && deepestMatch.s3B !== "") { parseInt(deepestMatch.s3A) > parseInt(deepestMatch.s3B) ? setsA++ : setsB++; }
+
+                let wonDeepest = (deepestMatch.teamA === myTeam.name && setsA > setsB) || (deepestMatch.teamB === myTeam.name && setsB > setsA);
+
+                if (deepestMatch.type === 'Finals') {
+                    playoffFinishText = wonDeepest ? `🏆 ${division} Champion` : `🥈 ${division} 2nd Place`;
+                } else if (deepestMatch.type === 'Semifinals') {
+                    playoffFinishText = wonDeepest ? `Adv to ${division} Finals` : `🥉 ${division} Semifinalist (3rd)`;
+                } else if (deepestMatch.type === 'Quarterfinals') {
+                    playoffFinishText = wonDeepest ? `Adv to ${division} Semis` : `🏅 ${division} Quarterfinalist (5th)`;
+                } else {
+                    playoffFinishText = `${division} Bracket`;
+                }
+            }
+        }
+    }
+
     let html = `
       <div class="data-card" style="text-align: center; padding: 20px; border-top: 4px solid ${displayColor}; margin-bottom: 25px;">
          ${logoHTML}
@@ -81,14 +136,20 @@ export function renderMyTeam() {
          
          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px;">
             <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
-                <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-weight: bold;">Pool Play</div>
+                <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-weight: bold; display: flex; justify-content: space-between;">
+                    <span>Pool Play</span>
+                    <span style="color: ${displayColor};">${poolFinishText}</span>
+                </div>
                 <div style="display: flex; justify-content: space-around;">
                    <div><div style="font-size: 1.3rem; font-weight: bold; color: var(--text-primary);">${myTeam.wins}-${myTeam.losses}</div><div style="font-size: 0.7rem; color: var(--text-secondary);">Match</div></div>
                    <div><div style="font-size: 1.3rem; font-weight: bold; color: var(--text-primary);">${myTeam.setsWon}-${myTeam.setsLost}</div><div style="font-size: 0.7rem; color: var(--text-secondary);">Set</div></div>
                 </div>
             </div>
             <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
-                <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-weight: bold;">Playoffs</div>
+                <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-weight: bold; display: flex; justify-content: space-between;">
+                    <span>Playoffs</span>
+                    <span style="color: ${displayColor};">${playoffFinishText}</span>
+                </div>
                 <div style="display: flex; justify-content: space-around;">
                    <div><div style="font-size: 1.3rem; font-weight: bold; color: var(--text-primary);">${bracketWins}-${bracketLosses}</div><div style="font-size: 0.7rem; color: var(--text-secondary);">Match</div></div>
                    <div><div style="font-size: 1.3rem; font-weight: bold; color: var(--text-primary);">${bracketSetsWon}-${bracketSetsLost}</div><div style="font-size: 0.7rem; color: var(--text-secondary);">Set</div></div>
