@@ -47,7 +47,7 @@ export function renderMyTeam() {
     let bracketWins = 0; let bracketLosses = 0;
     let bracketSetsWon = 0; let bracketSetsLost = 0;
     let bracketMatches = [];
-    let playedBracketMatches = []; // Excludes matches where they only reffed
+    let playedBracketMatches = []; 
 
     [...(globalBracketsGold?.matches || []), ...(globalBracketsSilver?.matches || [])].forEach(m => {
         if (m && (m.teamA === myTeam.name || m.teamB === myTeam.name || m.ref === myTeam.name)) {
@@ -75,14 +75,12 @@ export function renderMyTeam() {
         }
     });
 
-    // --- Calculate Pool Placement ---
     let poolFinishText = '';
     if (myTeam.place) {
         let ordinal = myTeam.place === 1 ? 'st' : myTeam.place === 2 ? 'nd' : myTeam.place === 3 ? 'rd' : 'th';
         poolFinishText = `${myTeam.place}${ordinal} Place`;
     }
 
-    // --- Calculate Smart Bracket Placement ---
     let division = "";
     if (globalBracketsGold?.matches?.some(m => m.teamA === myTeam.name || m.teamB === myTeam.name)) division = "Gold";
     else if (globalBracketsSilver?.matches?.some(m => m.teamA === myTeam.name || m.teamB === myTeam.name)) division = "Silver";
@@ -128,28 +126,28 @@ export function renderMyTeam() {
         }
     }
 
+    // UPDATED HTML: Moved finishes to centered pill badges below the header
     let html = `
       <div class="data-card" style="text-align: center; padding: 20px; border-top: 4px solid ${displayColor}; margin-bottom: 25px;">
          ${logoHTML}
          <h2 style="margin: 10px 0 5px 0; color: ${displayColor};">${myTeam.name}</h2>
          <div style="color: var(--text-secondary); font-size: 0.9rem;">🏐 ${myPool.name} | ${myPool.site}</div>
          
+         <div style="display: flex; justify-content: center; gap: 8px; margin-top: 15px; flex-wrap: wrap;">
+             ${poolFinishText ? `<span style="background: rgba(255,255,255,0.05); border: 1px solid ${displayColor}; color: ${displayColor}; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: bold;">Pool: ${poolFinishText}</span>` : ''}
+             ${playoffFinishText && playoffFinishText !== "TBD" ? `<span style="background: rgba(255,255,255,0.05); border: 1px solid ${displayColor}; color: ${displayColor}; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: bold;">${playoffFinishText}</span>` : ''}
+         </div>
+         
          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px;">
             <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
-                <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-weight: bold; display: flex; justify-content: space-between;">
-                    <span>Pool Play</span>
-                    <span style="color: ${displayColor};">${poolFinishText}</span>
-                </div>
+                <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-weight: bold;">Pool Play</div>
                 <div style="display: flex; justify-content: space-around;">
                    <div><div style="font-size: 1.3rem; font-weight: bold; color: var(--text-primary);">${myTeam.wins}-${myTeam.losses}</div><div style="font-size: 0.7rem; color: var(--text-secondary);">Match</div></div>
                    <div><div style="font-size: 1.3rem; font-weight: bold; color: var(--text-primary);">${myTeam.setsWon}-${myTeam.setsLost}</div><div style="font-size: 0.7rem; color: var(--text-secondary);">Set</div></div>
                 </div>
             </div>
             <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
-                <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-weight: bold; display: flex; justify-content: space-between;">
-                    <span>Playoffs</span>
-                    <span style="color: ${displayColor};">${playoffFinishText}</span>
-                </div>
+                <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-weight: bold;">Playoffs</div>
                 <div style="display: flex; justify-content: space-around;">
                    <div><div style="font-size: 1.3rem; font-weight: bold; color: var(--text-primary);">${bracketWins}-${bracketLosses}</div><div style="font-size: 0.7rem; color: var(--text-secondary);">Match</div></div>
                    <div><div style="font-size: 1.3rem; font-weight: bold; color: var(--text-primary);">${bracketSetsWon}-${bracketSetsLost}</div><div style="font-size: 0.7rem; color: var(--text-secondary);">Set</div></div>
