@@ -50,7 +50,7 @@ export function switchView(viewId) {
   }
 }
 
-// --- 4. EXPOSE TO HTML (Fixes all undefined errors) ---
+// --- 4. EXPOSE TO HTML ---
 window.switchView = switchView;
 window.openScoreModal = openScoreModal;
 window.closeScoreModal = closeScoreModal;
@@ -63,15 +63,22 @@ window.renderMyTeam = () => renderMyTeam();
 export async function silentRefresh() {
   const db = await fetchDatabase();
   
+  // A. Always calculate Standings
   if (typeof getStandingsData === 'function') {
     globalStandings = getStandingsData(db.pools, db.teams, db.matches);
   }
   
+  // B. NEW: Always calculate Brackets in the background so My Team can read them!
+  if (typeof getBracketData === 'function') {
+      globalBracketsGold = getBracketData("Gold", globalStandings, db.matches);
+      globalBracketsSilver = getBracketData("Silver", globalStandings, db.matches);
+  }
+
   const poolsView = document.getElementById('poolsView');
   const teamView = document.getElementById('teamView');
   const bracketsView = document.getElementById('bracketsView');
 
-  // Pools
+  // Pools View
   if (poolsView && poolsView.classList.contains('active') && typeof renderPools === 'function') {
     renderPools(globalStandings);
   } 
@@ -82,19 +89,16 @@ export async function silentRefresh() {
     renderMyTeam();
   }
 
-  // Brackets
-  const filter = document.getElementById('publicBracketFilter');
-  const activeDivision = filter ? filter.value : "Gold";
-
+  // Brackets View
   if (bracketsView && bracketsView.classList.contains('active')) {
-    if (typeof getBracketData === 'function') {
-      const bracketData = getBracketData(activeDivision, globalStandings, db.matches);
-      if (activeDivision === "Gold") globalBracketsGold = bracketData;
-      if (activeDivision === "Silver") globalBracketsSilver = bracketData;
-      
-      if (typeof renderBracket === 'function') {
-        renderBracket(bracketData);
-      }
+    const filter = document.getElementById('publicBracketFilter');
+    const activeDivision = filter ? filter.value : "Gold";
+    
+    // Pull from the globals we just calculated above
+    const bracketData = activeDivision === "Gold" ? globalBracketsGold : globalBracketsSilver;
+    
+    if (typeof renderBracket === 'function') {
+      renderBracket(bracketData);
     }
   }
 }
