@@ -10,18 +10,60 @@ const headers = {
   'Content-Type': 'application/json'
 };
 
+// --- NEW: SLUG & TOURNAMENT RESOLVER ---
+export let activeTournamentId = null;
+
+export async function getActiveTournament() {
+  if (activeTournamentId) return activeTournamentId; // Return if already loaded
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const slug = urlParams.get('t');
+
+  if (!slug) {
+    console.warn("No tournament slug specified in URL (?t=...).");
+    return null;
+  }
+
+  try {
+    // Query the tournaments table for this slug
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/tournaments?slug=eq.${slug}&select=id,name,status`, { headers });
+    const data = await res.json();
+
+    if (!data || data.length === 0) {
+      console.error("Tournament not found for slug:", slug);
+      return null;
+    }
+
+    activeTournamentId = data[0].id;
+    console.log(`Loaded Tournament: ${data[0].name} (${activeTournamentId})`);
+    return activeTournamentId;
+  } catch (err) {
+    console.error("Error fetching tournament by slug:", err);
+    return null;
+  }
+}
+
+// --- UPDATED: FETCH DATABASE DATA ---
 export async function fetchDatabase() {
   try {
-    const poolsRes = await fetch(`${SUPABASE_URL}/rest/v1/pools?select=*`, { headers });
+    const tournamentId = await getActiveTournament();
+
+    // If no valid tournament is loaded, return empty data
+    if (!tournamentId) {
+      return { pools: [], teams: [], matches: [] };
+    }
+
+    // Append tournament_id to only fetch data for the active tournament
+    const poolsRes = await fetch(`${SUPABASE_URL}/rest/v1/pools?tournament_id=eq.${tournamentId}&select=*`, { headers });
     const pools = await poolsRes.json();
 
-    const teamsRes = await fetch(`${SUPABASE_URL}/rest/v1/teams?select=*`, { headers });
+    const teamsRes = await fetch(`${SUPABASE_URL}/rest/v1/teams?tournament_id=eq.${tournamentId}&select=*`, { headers });
     const teams = await teamsRes.json();
 
-    const matchesRes = await fetch(`${SUPABASE_URL}/rest/v1/matches?select=*`, { headers });
+    const matchesRes = await fetch(`${SUPABASE_URL}/rest/v1/matches?tournament_id=eq.${tournamentId}&select=*`, { headers });
     const matches = await matchesRes.json();
 
-    console.log("Supabase Data:", { pools, teams, matches });
+    console.log("Supabase Data Filtered By Tournament:", { pools, teams, matches });
 
     return { pools, teams, matches };
   } catch (error) {
@@ -30,6 +72,7 @@ export async function fetchDatabase() {
   }
 }
 
+// --- SCORE SUBMISSION ---
 export async function submitScoreUpdate(refreshCallback) {
   const saveBtn = document.getElementById('saveScoreBtn');
   if (saveBtn) {
@@ -49,6 +92,8 @@ export async function submitScoreUpdate(refreshCallback) {
   };
 
   try {
+    // NOTE: Your /api/updateScore route on Vercel will eventually need to know the tournament_id 
+    // for RLS policies, but we can leave this as-is while we fix the frontend fetching!
     const res = await fetch('/api/updateScore', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -72,7 +117,7 @@ export async function submitScoreUpdate(refreshCallback) {
   }
 }
 
-// 2. Updated to use standard fetch to match your architecture
+// NOTE: This relies on the old admin_settings table. We will replace this with Supabase Auth soon!
 export async function verifyAdminPassword(passwordAttempt) {
     try {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/admin_settings?select=password&limit=1`, { headers });
@@ -80,7 +125,6 @@ export async function verifyAdminPassword(passwordAttempt) {
         
         if (!data || data.length === 0) return false;
         
-        // Supabase returns an array for selects, so we check the first row
         return data[0].password === passwordAttempt;
     } catch (err) {
         console.error("Auth check failed:", err);
@@ -91,13 +135,19 @@ export async function verifyAdminPassword(passwordAttempt) {
 // --- NEW ADMIN FUNCTIONS ---
 
 export async function adminInsertPool(poolName, siteName) {
+    if (!activeTournamentId) return false; // Ensure tournament is loaded
+
     try {
-        const payload = { name: poolName, site: siteName };
+        const payload = { 
+            name: poolName, 
+            site: siteName,
+            tournament_id: activeTournamentId // Automatically link to current tournament
+        };
         const res = await fetch(`${SUPABASE_URL}/rest/v1/pools`, {
             method: 'POST',
             headers: {
                 ...headers,
-                'Prefer': 'return=minimal' // Tells Supabase we don't need the whole row sent back
+                'Prefer': 'return=minimal' 
             },
             body: JSON.stringify(payload)
         });
@@ -111,7 +161,6 @@ export async function adminInsertPool(poolName, siteName) {
 export async function adminUploadLogo(file) {
     if (!file) return null;
     
-    // Create a unique file name so we don't accidentally overwrite logos with the same name
     const fileExt = file.name.split('.').pop();
     const uniqueFileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
 
@@ -128,7 +177,6 @@ export async function adminUploadLogo(file) {
         
         if (!res.ok) throw new Error('Upload failed');
         
-        // Return the permanent, public URL for the new image!
         return `${SUPABASE_URL}/storage/v1/object/public/logos/${uniqueFileName}`;
     } catch (err) {
         console.error("Logo upload error:", err);
@@ -137,11 +185,14 @@ export async function adminUploadLogo(file) {
 }
 
 export async function adminInsertTeam(teamName, color, logoUrl) {
+    if (!activeTournamentId) return false;
+
     try {
         const payload = { 
             name: teamName, 
             color: color, 
-            logoId: logoUrl // Saving the full Supabase URL here now!
+            logoId: logoUrl,
+            tournament_id: activeTournamentId // Automatically link to current tournament
         };
         
         const res = await fetch(`${SUPABASE_URL}/rest/v1/teams`, {
