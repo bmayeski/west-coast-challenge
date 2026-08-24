@@ -44,14 +44,56 @@ export function renderMyTeam() {
     let displayColor = lightenColor(myTeam.color, 0.4); 
     const logoHTML = myTeam.logoId ? `<img src="https://lh3.googleusercontent.com/d/${myTeam.logoId}" style="width: 50px; height: 50px; object-fit: contain;">` : '';
 
+    // NEW: Calculate bracket stats dynamically
+    let bracketWins = 0; let bracketLosses = 0;
+    let bracketSetsWon = 0; let bracketSetsLost = 0;
+    let bracketMatches = [];
+
+    [...(globalBracketsGold?.matches || []), ...(globalBracketsSilver?.matches || [])].forEach(m => {
+        if (m && (m.teamA === myTeam.name || m.teamB === myTeam.name || m.ref === myTeam.name)) {
+            bracketMatches.push(m);
+            
+            let isComplete = m.status === 'Complete' || m.status === 'Final';
+            // Only tally stats if myTeam is actually playing (not just reffing)
+            if (isComplete && (m.teamA === myTeam.name || m.teamB === myTeam.name)) {
+                let setsA = 0; let setsB = 0;
+                if (m.s1A !== "" && m.s1B !== "") { parseInt(m.s1A) > parseInt(m.s1B) ? setsA++ : setsB++; }
+                if (m.s2A !== "" && m.s2B !== "") { parseInt(m.s2A) > parseInt(m.s2B) ? setsA++ : setsB++; }
+                if (setsA < 2 && setsB < 2 && m.s3A !== "" && m.s3B !== "") { parseInt(m.s3A) > parseInt(m.s3B) ? setsA++ : setsB++; }
+                
+                if (m.teamA === myTeam.name) {
+                    bracketSetsWon += setsA; bracketSetsLost += setsB;
+                    if (setsA > setsB) bracketWins++; else if (setsB > setsA) bracketLosses++;
+                } else {
+                    bracketSetsWon += setsB; bracketSetsLost += setsA;
+                    if (setsB > setsA) bracketWins++; else if (setsA > setsB) bracketLosses++;
+                }
+            }
+        }
+    });
+
+    // UPDATED: Two side-by-side mini dashboards for Pool Play and Playoffs
     let html = `
       <div class="data-card" style="text-align: center; padding: 20px; border-top: 4px solid ${displayColor}; margin-bottom: 25px;">
          ${logoHTML}
          <h2 style="margin: 10px 0 5px 0; color: ${displayColor};">${myTeam.name}</h2>
          <div style="color: var(--text-secondary); font-size: 0.9rem;">🏐 ${myPool.name} | ${myPool.site}</div>
-         <div style="display: flex; justify-content: center; gap: 20px; margin-top: 15px;">
-            <div><div style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary);">${myTeam.wins} - ${myTeam.losses}</div><div style="font-size: 0.75rem; color: var(--text-secondary);">Matches</div></div>
-            <div><div style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary);">${myTeam.setsWon} - ${myTeam.setsLost}</div><div style="font-size: 0.75rem; color: var(--text-secondary);">Sets</div></div>
+         
+         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px;">
+            <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+                <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-weight: bold;">Pool Play</div>
+                <div style="display: flex; justify-content: space-around;">
+                   <div><div style="font-size: 1.3rem; font-weight: bold; color: var(--text-primary);">${myTeam.wins}-${myTeam.losses}</div><div style="font-size: 0.7rem; color: var(--text-secondary);">Match</div></div>
+                   <div><div style="font-size: 1.3rem; font-weight: bold; color: var(--text-primary);">${myTeam.setsWon}-${myTeam.setsLost}</div><div style="font-size: 0.7rem; color: var(--text-secondary);">Set</div></div>
+                </div>
+            </div>
+            <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+                <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-weight: bold;">Playoffs</div>
+                <div style="display: flex; justify-content: space-around;">
+                   <div><div style="font-size: 1.3rem; font-weight: bold; color: var(--text-primary);">${bracketWins}-${bracketLosses}</div><div style="font-size: 0.7rem; color: var(--text-secondary);">Match</div></div>
+                   <div><div style="font-size: 1.3rem; font-weight: bold; color: var(--text-primary);">${bracketSetsWon}-${bracketSetsLost}</div><div style="font-size: 0.7rem; color: var(--text-secondary);">Set</div></div>
+                </div>
+            </div>
          </div>
       </div>
     `;
@@ -95,7 +137,6 @@ export function renderMyTeam() {
         let teamAWon = isComplete && setsA > setsB;
         let teamBWon = isComplete && setsB > setsA;
 
-        // UPDATED: A compact, perfect circle with a checkmark instead of the bulky "WINNER" text!
         let badgeStyle = `display: inline-flex; align-items: center; justify-content: center; background: ${displayColor}; color: ${badgeTextColor}; width: 16px; height: 16px; border-radius: 50%; margin-left: 6px; font-size: 0.65rem; font-weight: bold; flex-shrink: 0;`;
         let badgeA = teamAWon ? `<span style="${badgeStyle}" title="Winner">✓</span>` : '';
         let badgeB = teamBWon ? `<span style="${badgeStyle}" title="Winner">✓</span>` : '';
@@ -168,13 +209,6 @@ export function renderMyTeam() {
         });
         html += `</div>`;
     }
-
-    let bracketMatches = [];
-    [...(globalBracketsGold?.matches || []), ...(globalBracketsSilver?.matches || [])].forEach(m => {
-        if (m && (m.teamA === myTeam.name || m.teamB === myTeam.name || m.ref === myTeam.name)) {
-            bracketMatches.push(m);
-        }
-    });
 
     if (bracketMatches.length > 0) {
         html += `<h3 style="font-size: 1.1rem; color: var(--text-primary); margin-top: 25px; border-bottom: 1px solid var(--border-color); padding-bottom: 5px;">Bracket Matches</h3>`;
