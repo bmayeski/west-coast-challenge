@@ -3,65 +3,81 @@ let teamIdToName = {};
 export function getStandingsData(pools = [], teams = [], matches = []) {
   const standings = {};
 
-  // 1. Initialize Pools
   if (Array.isArray(pools)) {
     pools.forEach(p => {
-      const poolName = typeof p === 'string' ? p : (p.pool_id || p.name || p.id || 'Pool 1');
-      const site = p.site || p.location || '';
-      standings[poolName] = { name: poolName, site: site, teams: [], matches: [] };
+      const isArray = Array.isArray(p);
+      const poolName = isArray ? p[0] : (p.pool_id || p.name || p.id || 'Pool 1');
+      const site = isArray ? p[1] : (p.site || p.location || '');
+      standings[poolName] = { name: poolName, site: site, teams: [], matches: [], isLocked: false };
     });
   }
 
-  const createEmptyStats = (teamName, poolName = 'Unassigned', color = null, logoId = null) => ({
-    name: teamName,
-    pool: poolName,
-    color: color,
-    logoId: logoId,
-    wins: 0, losses: 0, setsWon: 0, setsLost: 0, pointsFor: 0, pointsAgainst: 0, pointDiff: 0
+  const createEmptyStats = (teamName, poolName = 'Unassigned', color = null, logoId = null, seed = 99) => ({
+    name: teamName, pool: poolName, color: color, logoId: logoId, seed: seed,
+    wins: 0, losses: 0, setsWon: 0, setsLost: 0, pointsFor: 0, pointsAgainst: 0, pointDiff: 0, place: 0
   });
 
-  // 2. Initialize Teams and Build ID Dictionary
   const teamStats = {};
-  const teamIdToName = {}; // <--- Our new translator dictionary
+  
+  // Clear the global dictionary so it doesn't hold stale data
+  for (const prop of Object.getOwnPropertyNames(teamIdToName)) {
+    delete teamIdToName[prop];
+  }
 
   if (Array.isArray(teams)) {
     teams.forEach(t => {
-      const name = typeof t === 'string' ? t : (t.name || t.team_name || t.id);
-      const pool = typeof t === 'object' ? (t.pool_id || t.poolId || t.pool || 'Unassigned') : 'Unassigned';
-      
-      // Grab colors and logos
-      const color = t.color || null;
-      const logoId = t.logo_id || t.logoId || null;
+      const isArray = Array.isArray(t);
+      const id = isArray ? t[0] : t.id;
+      const name = isArray ? t[1] : (t.name || t.team_name || t.id);
+      const pool = isArray ? t[4] : (t.pool_id || t.poolId || t.pool || 'Unassigned');
+      const color = isArray ? t[6] : (t.color || null);
+      const logoId = isArray ? t[3] : (t.logo_id || t.logoId || null);
+      const seedRaw = isArray ? t[5] : t.seed;
+      const seed = seedRaw !== undefined && seedRaw !== null && seedRaw !== '' ? parseInt(seedRaw, 10) : 99;
 
-      teamIdToName[t.id] = name; // Map the ID to the Name
-
-      if (name) teamStats[name] = createEmptyStats(name, pool, color, logoId);
+      if (id) teamIdToName[id] = name; 
+      if (name) teamStats[name] = createEmptyStats(name, pool, color, logoId, seed);
     });
   }
 
-  // 3. Process Matches (With Translation)
   if (Array.isArray(matches)) {
     matches.forEach(m => {
-      if (!m.teamA || !m.teamB) return;
-      
-      // TRANSLATE: Convert the raw IDs into actual Team Names!
-      const teamAName = teamIdToName[m.teamA] || m.teamA;
-      const teamBName = teamIdToName[m.teamB] || m.teamB;
-      const refName = teamIdToName[m.ref] || m.ref || '-';
+      const isArray = Array.isArray(m);
+      const mId = isArray ? m[0] : m.id;
+      const mType = isArray ? m[1] : (m.match_type || m.type || '');
+      const tA_raw = isArray ? m[2] : (m.team_a_id || m.teamA);
+      const tB_raw = isArray ? m[3] : (m.team_b_id || m.teamB);
+      const ref_raw = isArray ? m[4] : (m.ref_team_id || m.ref);
+      const poolKey = isArray ? m[5] : (m.pool_id || m.poolId || m.pool || 'Unassigned');
+      const time = isArray ? m[6] : m.time;
+      const s1A = isArray ? m[7] : (m.s1a !== undefined ? m.s1a : m.s1A);
+      const s1B = isArray ? m[8] : (m.s1b !== undefined ? m.s1b : m.s1B);
+      const s2A = isArray ? m[9] : (m.s2a !== undefined ? m.s2a : m.s2A);
+      const s2B = isArray ? m[10] : (m.s2b !== undefined ? m.s2b : m.s2B);
+      const s3A = isArray ? m[11] : (m.s3a !== undefined ? m.s3a : m.s3A);
+      const s3B = isArray ? m[12] : (m.s3b !== undefined ? m.s3b : m.s3B);
+      const status = isArray ? m[13] : (m.status || 'Pending');
 
-      const poolKey = m.pool_id || m.poolId || m.pool || 'Unassigned';
-      if (standings[poolKey]) {
-          // Push the Translated Match into the UI Breakdown Table
-          standings[poolKey].matches.push({
-              ...m,
-              teamA: teamAName,
-              teamB: teamBName,
-              ref: refName
-          });
+      if (!tA_raw || !tB_raw) return;
+      
+      const teamAName = teamIdToName[tA_raw] || tA_raw;
+      const teamBName = teamIdToName[tB_raw] || tB_raw;
+      const refName = teamIdToName[ref_raw] || ref_raw || '-';
+
+      const isPoolMatch = mType.toLowerCase() === 'pool' || mType.toLowerCase() === 'pool play';
+      
+      const uiMatch = {
+         id: mId, time: time, status: status,
+         teamA: teamAName, teamB: teamBName, ref: refName,
+         s1A, s1B, s2A, s2B, s3A, s3B
+      };
+
+      if (isPoolMatch && standings[poolKey]) {
+          standings[poolKey].matches.push(uiMatch);
       }
 
-      const isComplete = m.status === 'Complete' || m.status === 'Final';
-      if (!isComplete) return;
+      const isComplete = status === 'Complete' || status === 'Final';
+      if (!isComplete || !isPoolMatch) return;
 
       if (!teamStats[teamAName]) teamStats[teamAName] = createEmptyStats(teamAName);
       if (!teamStats[teamBName]) teamStats[teamBName] = createEmptyStats(teamBName);
@@ -76,9 +92,13 @@ export function getStandingsData(pools = [], teams = [], matches = []) {
         }
       };
 
-      processSet(m.s1A, m.s1B);
-      processSet(m.s2A, m.s2B);
-      processSet(m.s3A, m.s3B);
+      processSet(s1A, s1B);
+      processSet(s2A, s2B);
+      
+      // BEST OF 3 LOGIC: Only count 3rd set if nobody has 2 wins yet
+      if (setsA < 2 && setsB < 2) {
+          processSet(s3A, s3B);
+      }
 
       teamStats[teamAName].setsWon += setsA; teamStats[teamAName].setsLost += setsB;
       teamStats[teamAName].pointsFor += ptsA; teamStats[teamAName].pointsAgainst += ptsB;
@@ -94,7 +114,6 @@ export function getStandingsData(pools = [], teams = [], matches = []) {
     });
   }
 
-  // 4. Assign and Sort
   Object.values(teamStats).forEach(st => {
     st.pointDiff = st.pointsFor - st.pointsAgainst;
     const poolKey = st.pool;
@@ -110,6 +129,9 @@ export function getStandingsData(pools = [], teams = [], matches = []) {
       if (b.pointDiff !== a.pointDiff) return b.pointDiff - a.pointDiff;
       return b.pointsFor - a.pointsFor;
     });
+
+    standings[poolName].teams.forEach((t, i) => t.place = i + 1);
+    standings[poolName].teams.sort((a, b) => a.seed - b.seed);
   });
 
   return standings;
@@ -124,24 +146,19 @@ export function getBracketData(activeDivision = "Gold", standings = {}, matches 
       const poolTeams = pool.teams || [];
       const poolMatches = pool.matches || [];
 
-      // Check how many matches are still pending in this pool
       const pendingMatches = poolMatches.filter(m => {
           const status = (m.status || '').toLowerCase();
           return status !== 'complete' && status !== 'final';
       }).length;
 
-      // SMART LOCK: If there are 2 or fewer matches left, check if the top seeds are mathematically safe
-      // (Or if 0 matches are pending, they are 100% locked)
       let canAssignSeeds = false;
-
       if (pendingMatches === 0) {
-          canAssignSeeds = true; // All matches done, fully locked
+          canAssignSeeds = true; 
       } else if (pendingMatches <= 2 && poolTeams.length >= 4) {
-          // Check if 1st place has more wins than 3rd place plus the remaining matches available
-          let topTeamWins = poolTeams[0].wins || 0;
-          let thirdTeamWins = poolTeams[2].wins || 0;
+          const sortedByRank = [...poolTeams].sort((a, b) => a.place - b.place);
+          let topTeamWins = sortedByRank[0]?.wins || 0;
+          let thirdTeamWins = sortedByRank[2]?.wins || 0;
           
-          // If the leader's win total is mathematically out of reach, lock the top seeds early!
           if (topTeamWins > thirdTeamWins + (pendingMatches * 1)) {
               canAssignSeeds = true;
           }
@@ -150,47 +167,70 @@ export function getBracketData(activeDivision = "Gold", standings = {}, matches 
       if (canAssignSeeds) {
         const poolClean = poolKey.replace(/pool/i, '').trim().toLowerCase(); 
         
-        poolTeams.forEach((team, index) => {
-          const rank = index + 1;
+        poolTeams.forEach((team) => {
+          const rank = team.place; 
           const ordinal = rank === 1 ? 'st' : rank === 2 ? 'nd' : rank === 3 ? 'rd' : 'th';
           
           seedMap[`pool ${poolClean} - ${rank}${ordinal}`] = team.name; 
-          seedMap[`pool ${poolClean} - ${rank}`] = team.name;           
+          seedMap[`pool ${poolClean} - ${rank}`] = team.name;          
           seedMap[`pool ${poolClean} #${rank}`] = team.name;            
         });
       }
     });
   }
 
-  // 2. Find Bracket Matches for the Selected Division
   const divisionMatches = (matches || []).filter(m => {
-    if (!m.type) return false;
-    
-    // Support a dedicated 'division' column if you have one, or check the 'type' column
-    const typeStr = m.type.toLowerCase();
-    const divStr = (m.division || m.type || '').toLowerCase();
-    const targetDiv = activeDivision.toLowerCase();
-
-    // Check if it's a bracket round AND if it includes "gold" or "silver"
-    const isBracketMatch = typeStr.includes("quarter") || typeStr.includes("semi") || typeStr.includes("final") || typeStr.includes("seeding");
-    const isCorrectDivision = divStr.includes(targetDiv);
-
-    return isBracketMatch && isCorrectDivision;
+    const isArray = Array.isArray(m);
+    const mId = (isArray ? m[0] : m.id || '').toUpperCase();
+    if (activeDivision === 'Gold' && mId.startsWith('G')) return true;
+    if (activeDivision === 'Silver' && mId.startsWith('S')) return true;
+    return false;
   });
 
-  // 3. Translate IDs -> Seed Map -> Fallback
-  const resolvedMatches = divisionMatches.map(match => {
-    let nameA = teamIdToName[match.teamA] || match.teamA;
-    let nameB = teamIdToName[match.teamB] || match.teamB;
+  const resolvedMatches = divisionMatches.map(m => {
+    const isArray = Array.isArray(m);
+    const mId = isArray ? m[0] : m.id;
+    const tA_raw = isArray ? m[2] : (m.team_a_id || m.teamA);
+    const tB_raw = isArray ? m[3] : (m.team_b_id || m.teamB);
+    const ref_raw = isArray ? m[4] : (m.ref_team_id || m.ref);
+    const time = isArray ? m[6] : m.time;
+    const s1A = isArray ? m[7] : (m.s1a !== undefined ? m.s1a : m.s1A);
+    const s1B = isArray ? m[8] : (m.s1b !== undefined ? m.s1b : m.s1B);
+    const s2A = isArray ? m[9] : (m.s2a !== undefined ? m.s2a : m.s2A);
+    const s2B = isArray ? m[10] : (m.s2b !== undefined ? m.s2b : m.s2B);
+    const s3A = isArray ? m[11] : (m.s3a !== undefined ? m.s3a : m.s3A);
+    const s3B = isArray ? m[12] : (m.s3b !== undefined ? m.s3b : m.s3B);
+    const status = isArray ? m[13] : (m.status || 'Pending');
+
+    let nameA = teamIdToName[tA_raw] || tA_raw;
+    let nameB = teamIdToName[tB_raw] || tB_raw;
     
     if (nameA && seedMap[nameA.toLowerCase()]) nameA = seedMap[nameA.toLowerCase()];
     if (nameB && seedMap[nameB.toLowerCase()]) nameB = seedMap[nameB.toLowerCase()];
 
+    const matchIdString = (mId || '').toUpperCase();
+    let roundType = 'Matches';
+    
+    if (matchIdString.startsWith('GS') || matchIdString.startsWith('SS')) {
+        roundType = 'Seeding';
+    } else if (matchIdString === 'G1' || matchIdString === 'G2' || matchIdString === 'G3' || matchIdString === 'G4' || 
+               matchIdString === 'S1' || matchIdString === 'S2' || matchIdString === 'S3' || matchIdString === 'S4') {
+        roundType = 'Quarterfinals';
+    } else if (matchIdString === 'G5' || matchIdString === 'G6' || matchIdString === 'S5' || matchIdString === 'S6') {
+        roundType = 'Semifinals';
+    } else if (matchIdString === 'G7' || matchIdString === 'S7') {
+        roundType = 'Finals';
+    }
+
     return {
-      ...match,
+      id: mId,
+      type: roundType, 
+      time: time,
+      status: status,
       teamA: nameA || 'TBD',
       teamB: nameB || 'TBD',
-      ref: teamIdToName[match.ref] || match.ref || '-'
+      ref: teamIdToName[ref_raw] || ref_raw || '-',
+      s1A, s1B, s2A, s2B, s3A, s3B
     };
   });
 

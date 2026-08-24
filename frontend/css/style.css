@@ -259,3 +259,50 @@ body {
   gap: 15px;
   margin-top: 15px;
 }
+
+/* Base Card Styling */
+.match-card {
+  background-color: #1C2541; /* Deep slate */
+  border-radius: 8px;
+  padding: 12px;
+  width: 260px;
+  color: #FFFFFF;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+
+/* Round Headers */
+.round-title {
+  color: #FF7300; /* Vibrant orange */
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Team Row & Winner Highlight */
+.team-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  margin: 4px 0;
+  border-radius: 6px;
+  border: 1px solid transparent; /* Prevents layout shift */
+}
+
+.team-row.winner {
+  border: 1px solid #FF7300; /* Orange border for winners */
+}
+
+/* Ref Duty Footer */
+.ref-duty {
+  border-top: 1px dashed #4A5568;
+  margin-top: 10px;
+  padding-top: 10px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #A0AEC0;
+}
+
+.ref-duty .assigned {
+  color: #FF7300;
+}

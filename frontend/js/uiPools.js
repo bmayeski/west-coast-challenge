@@ -11,38 +11,41 @@ export function renderPools(standingsData) {
     const siteColor = getSiteColor(pool.site);
 
     // 1. Build the styled card header and standings table
+    // ADDED: overflow-x wrapper and min-width to prevent cards from bursting
     html += `
-      <div class="data-card">
+      <div class="data-card" style="overflow: hidden;">
         <div class="card-header" style="background-color: ${siteColor}; color: #FFFFFF; border-bottom: none;">
           <span>🏐 ${poolName}</span>
           <span style="font-size: 0.75rem; font-weight: normal;">${pool.site || ''}</span>
         </div>
-        <table class="standings-table">
-          <thead>
-            <tr>
-              <th style="width: 30px;">#</th>
-              <th style="text-align: left;">Team</th>
-              <th colspan="2">Matches</th>
-              <th colspan="2">Sets</th>
-              <th style="width: 45px; white-space: nowrap;">Set +/-</th>
-              <th style="width: 45px; white-space: nowrap;">Pt +/-</th>
-            </tr>
-            <tr style="background-color: var(--surface-dark);">
-              <th></th>
-              <th></th>
-              <th style="width: 30px; color: var(--accent-orange);">W</th>
-              <th style="width: 30px; color: var(--text-secondary);">L</th>
-              <th style="width: 30px; color: var(--accent-orange);">W</th>
-              <th style="width: 30px; color: var(--text-secondary);">L</th>
-              <th></th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
+        
+        <div style="overflow-x: auto; width: 100%;">
+          <table class="standings-table" style="min-width: 380px; width: 100%;">
+            <thead>
+              <tr>
+                <th style="width: 25px;">Seed</th>
+                <th style="text-align: left;">Team</th>
+                <th colspan="2">Matches</th>
+                <th colspan="2">Sets</th>
+                <th style="width: 45px; white-space: nowrap;">Set +/-</th>
+                <th style="width: 45px; white-space: nowrap;">Pt +/-</th>
+              </tr>
+              <tr style="background-color: var(--surface-dark);">
+                <th></th>
+                <th></th>
+                <th style="width: 25px; color: var(--text-primary); text-align: center;">W</th>
+                <th style="width: 25px; color: var(--text-primary); text-align: center;">L</th>
+                <th style="width: 25px; color: var(--text-secondary); text-align: center;">W</th>
+                <th style="width: 25px; color: var(--text-secondary); text-align: center;">L</th>
+                <th></th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
     `;
 
     // 2. Loop through the teams and build the rows
-    pool.teams.forEach((team, index) => {
+    pool.teams.forEach((team) => {
       let setDiff = (team.setsWon || 0) - (team.setsLost || 0);
       let formattedSetDiff = setDiff > 0 ? '+' + setDiff : setDiff;
       let formattedPtDiff = team.pointDiff > 0 ? '+' + team.pointDiff : (team.pointDiff || 0);
@@ -50,47 +53,66 @@ export function renderPools(standingsData) {
       let diffStyleSet = setDiff > 0 ? "color: var(--text-primary); font-weight: 600;" : "color: var(--text-secondary); font-weight: normal;";
       let diffStylePt = team.pointDiff > 0 ? "color: var(--text-primary); font-weight: 600;" : "color: var(--text-secondary); font-weight: normal;";
 
-      // Add Logos and Colors back in!
       const logoHTML = team.logoId 
         ? `<img src="https://lh3.googleusercontent.com/d/${team.logoId}" style="width: 25px; height: 25px; object-fit: contain; flex-shrink: 0; margin-right: 8px;">`
         : `<div style="width: 25px; height: 25px; background: var(--surface-lighter); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: bold; color: var(--text-secondary); flex-shrink: 0; margin-right: 8px;">?</div>`;
         
       const displayColor = lightenColor(team.color, 0.4);
 
+      // GENERATE THE FINISH BADGE
+      let finishBadge = '';
+      if (team.place) {
+          let badgeColor = '';
+          if (team.place === 1) badgeColor = '#D4AF37'; // Gold
+          else if (team.place === 2) badgeColor = '#94A3B8'; // Silver
+          else if (team.place === 3) badgeColor = '#B08D57'; // Bronze
+          else badgeColor = 'var(--surface-lighter)'; // 4th
+
+          let textColor = team.place === 4 ? 'var(--text-secondary)' : '#FFF';
+          let ordinal = team.place === 1 ? 'st' : team.place === 2 ? 'nd' : team.place === 3 ? 'rd' : 'th';
+          
+          // FIX: Moved to the left with a fixed width (28px) for perfect column alignment
+          finishBadge = `<span style="background-color: ${badgeColor}; color: ${textColor}; font-size: 0.65rem; padding: 2px 0; width: 28px; text-align: center; border-radius: 12px; font-weight: bold; margin-right: 8px; flex-shrink: 0;">${team.place}${ordinal}</span>`;
+      }
+
+      // FIX: Added text-overflow: ellipsis to truncate super long names
       html += `
-            <tr>
-              <td style="color: var(--text-secondary); font-size: 0.75rem; width: 30px;">${index + 1}</td>
-              <td>
-                <div class="team-name-wrapper" style="display: flex; align-items: center;">
-                  ${logoHTML}
-                  <span style="color: ${displayColor}; font-weight: 600;">${team.name}</span>
-                </div>
-              </td>
-              <td style="color: var(--text-primary); font-weight: 600; width: 30px;">${team.wins || 0}</td>
-              <td style="color: var(--text-secondary); font-weight: normal; width: 30px;">${team.losses || 0}</td>
-              <td style="color: var(--text-primary); font-weight: 600; width: 30px;">${team.setsWon || 0}</td>
-              <td style="color: var(--text-secondary); font-weight: normal; width: 30px;">${team.setsLost || 0}</td>
-              <td style="${diffStyleSet} width: 45px;">${formattedSetDiff}</td>
-              <td style="${diffStylePt} width: 45px;">${formattedPtDiff}</td>
-            </tr>
+              <tr>
+                <td style="color: var(--text-secondary); font-size: 0.75rem; width: 25px; text-align: center;">${team.seed !== 99 ? team.seed : '-'}</td>
+                <td style="max-width: 140px;">
+                  <div class="team-name-wrapper" style="display: flex; align-items: center;">
+                    ${finishBadge}
+                    ${logoHTML}
+                    <span style="color: ${displayColor}; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${team.name}">${team.name}</span>
+                  </div>
+                </td>
+                <td style="color: var(--text-primary); font-weight: bold; width: 25px; text-align: center;">${team.wins || 0}</td>
+                <td style="color: var(--text-primary); font-weight: bold; width: 25px; text-align: center;">${team.losses || 0}</td>
+                <td style="color: var(--text-secondary); font-weight: normal; width: 25px; text-align: center;">${team.setsWon || 0}</td>
+                <td style="color: var(--text-secondary); font-weight: normal; width: 25px; text-align: center;">${team.setsLost || 0}</td>
+                <td style="${diffStyleSet} width: 45px; text-align: center;">${formattedSetDiff}</td>
+                <td style="${diffStylePt} width: 45px; text-align: center;">${formattedPtDiff}</td>
+              </tr>
       `;
     });
 
-    html += `</tbody></table>`;
+    html += `</tbody></table></div>`; // Closes responsive wrapper
 
     // 3. Build the Match Breakdown Table (if matches exist)
     if (pool.matches && pool.matches.length > 0) {
+      // ADDED: Overflow wrapper here as well
       html += `
-        <table class="breakdown-table" style="margin-top: 10px; background-color: var(--surface-lighter);">
-          <thead>
-            <tr>
-              <th style="text-align: left; padding-left: 15px;">Match Breakdown</th>
-              <th colspan="2">Game 1</th>
-              <th colspan="2">Game 2</th>
-              <th colspan="2">Game 3</th>
-            </tr>
-          </thead>
-          <tbody>
+        <div style="overflow-x: auto; width: 100%;">
+          <table class="breakdown-table" style="margin-top: 10px; background-color: var(--surface-lighter); min-width: 380px;">
+            <thead>
+              <tr>
+                <th style="text-align: left; padding-left: 15px;">Match Breakdown</th>
+                <th colspan="2">Game 1</th>
+                <th colspan="2">Game 2</th>
+                <th colspan="2">Game 3</th>
+              </tr>
+            </thead>
+            <tbody>
       `;
 
       pool.matches.forEach((match) => {
@@ -106,35 +128,32 @@ export function renderPools(standingsData) {
         let teamBStyle = (isComplete && setsB > setsA) ? "color: var(--accent-orange); font-weight: 600;" : (isComplete ? "color: var(--text-secondary);" : "color: var(--text-primary); font-weight: 500;");
 
         html += `
-            <tr style="opacity: ${opacity};">
-              <td style="text-align: left; padding-left: 15px;">
-                <div style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">
-                  <span style="${teamAStyle}">${match.teamA}</span> 
-                  <span style="color: var(--text-secondary); font-weight: normal; font-size: 0.75rem;">vs</span> 
-                  <span style="${teamBStyle}">${match.teamB}</span>
-                </div>
-                <div style="font-size: 0.7rem; color: var(--text-secondary);">
-                   Ref: ${match.ref || '-'} <span style="margin-left: 8px; color: var(--accent-orange); font-weight: bold;">🕒 ${formatTime(match.time)}</span>
-                </div>
-              </td>
-              
-              <td style="${getScoreStyle(match.s1A, match.s1B)} border-right: 1px solid var(--surface-dark);">${match.s1A || "-"}</td>
-              <td style="${getScoreStyle(match.s1B, match.s1A)} border-right: 1px solid var(--border-color);">${match.s1B || "-"}</td>
-              
-              <td style="${getScoreStyle(match.s2A, match.s2B)} border-right: 1px solid var(--surface-dark);">${match.s2A || "-"}</td>
-              <td style="${getScoreStyle(match.s2B, match.s2A)} border-right: 1px solid var(--border-color);">${match.s2B || "-"}</td>
-              
-              <td style="${getScoreStyle(match.s3A, match.s3B)} border-right: 1px solid var(--surface-dark);">${match.s3A || "-"}</td>
-              <td style="${getScoreStyle(match.s3B, match.s3A)}">${match.s3B || "-"}</td>
-            </tr>
+              <tr style="opacity: ${opacity};">
+                <td style="text-align: left; padding-left: 15px;">
+                  <div style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">
+                    <span style="${teamAStyle}">${match.teamA}</span> 
+                    <span style="color: var(--text-secondary); font-weight: normal; font-size: 0.75rem;">vs</span> 
+                    <span style="${teamBStyle}">${match.teamB}</span>
+                  </div>
+                  <div style="font-size: 0.7rem; color: var(--text-secondary);">
+                     Ref: ${match.ref || '-'} <span style="margin-left: 8px; color: var(--accent-orange); font-weight: bold;">🕒 ${formatTime(match.time)}</span>
+                  </div>
+                </td>
+                <td style="${getScoreStyle(match.s1A, match.s1B)} border-right: 1px solid var(--surface-dark); text-align: center;">${match.s1A || "-"}</td>
+                <td style="${getScoreStyle(match.s1B, match.s1A)} border-right: 1px solid var(--border-color); text-align: center;">${match.s1B || "-"}</td>
+                <td style="${getScoreStyle(match.s2A, match.s2B)} border-right: 1px solid var(--surface-dark); text-align: center;">${match.s2A || "-"}</td>
+                <td style="${getScoreStyle(match.s2B, match.s2A)} border-right: 1px solid var(--border-color); text-align: center;">${match.s2B || "-"}</td>
+                <td style="${getScoreStyle(match.s3A, match.s3B)} border-right: 1px solid var(--surface-dark); text-align: center;">${match.s3A || "-"}</td>
+                <td style="${getScoreStyle(match.s3B, match.s3A)} text-align: center;">${match.s3B || "-"}</td>
+              </tr>
         `;
       });
-      html += `</tbody></table>`;
+      html += `</tbody></table></div>`; // Closes responsive wrapper
     }
 
-    html += `</div>`; // Closes the data-card
+    html += `</div>`; 
   });
 
-  // 4. Inject the beautiful HTML into the webpage
+  html += `<div style="text-align: center; color: var(--text-secondary); font-size: 0.75rem; font-style: italic; margin-top: 15px; padding-bottom: 20px;">* Times are estimates. Matches start when courts clear.</div>`;
   container.innerHTML = html;
 }
