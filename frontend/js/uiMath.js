@@ -1,238 +1,93 @@
-let teamIdToName = {};
+// uiMath.js
+import { getTeams, getMatches, getPools } from './state.js';
 
-export function getStandingsData(pools = [], teams = [], matches = []) {
-  const standings = {};
+export function getPoolStandings(poolId) {
+    const allTeams = getTeams();
+    const allMatches = getMatches();
 
-  if (Array.isArray(pools)) {
-    pools.forEach(p => {
-      const isArray = Array.isArray(p);
-      const poolName = isArray ? p[0] : (p.pool_id || p.name || p.id || 'Pool 1');
-      const site = isArray ? p[1] : (p.site || p.location || '');
-      standings[poolName] = { name: poolName, site: site, teams: [], matches: [], isLocked: false };
-    });
-  }
+    const poolTeams = allTeams.filter(team => team.pool_id === poolId);
 
-  const createEmptyStats = (teamName, poolName = 'Unassigned', color = null, logoId = null, seed = 99) => ({
-    name: teamName, pool: poolName, color: color, logoId: logoId, seed: seed,
-    wins: 0, losses: 0, setsWon: 0, setsLost: 0, pointsFor: 0, pointsAgainst: 0, pointDiff: 0, place: 0
-  });
+    const standings = poolTeams.map(team => ({
+        id: team.id,
+        name: team.name,
+        color: team.color || '#3b82f6',
+        logo_id: team.logo_id,
+        seed: parseInt(team.seed, 10) || 99, 
+        matchesPlayed: 0,
+        matchesWon: 0,
+        matchesLost: 0,
+        setsWon: 0,
+        setsLost: 0,
+        pointsFor: 0,
+        pointsAgainst: 0,
+        setDiff: 0,
+        pointDiff: 0
+    }));
 
-  const teamStats = {};
-  
-  // Clear the global dictionary so it doesn't hold stale data
-  for (const prop of Object.getOwnPropertyNames(teamIdToName)) {
-    delete teamIdToName[prop];
-  }
+    const statsMap = new Map(standings.map(s => [s.id, s]));
 
-  if (Array.isArray(teams)) {
-    teams.forEach(t => {
-      const isArray = Array.isArray(t);
-      const id = isArray ? t[0] : t.id;
-      const name = isArray ? t[1] : (t.name || t.team_name || t.id);
-      const pool = isArray ? t[4] : (t.pool_id || t.poolId || t.pool || 'Unassigned');
-      const color = isArray ? t[6] : (t.color || null);
-      const logoId = isArray ? t[3] : (t.logo_id || t.logoId || null);
-      const seedRaw = isArray ? t[5] : t.seed;
-      const seed = seedRaw !== undefined && seedRaw !== null && seedRaw !== '' ? parseInt(seedRaw, 10) : 99;
+    allMatches.forEach(match => {
+        if (match.status !== 'completed' && match.status !== 'complete') return;
+        
+        const t1 = statsMap.get(match.teamA);
+        const t2 = statsMap.get(match.teamB);
 
-      if (id) teamIdToName[id] = name; 
-      if (name) teamStats[name] = createEmptyStats(name, pool, color, logoId, seed);
-    });
-  }
+        if (!t1 || !t2) return;
 
-  if (Array.isArray(matches)) {
-    matches.forEach(m => {
-      const isArray = Array.isArray(m);
-      const mId = isArray ? m[0] : m.id;
-      const mType = isArray ? m[1] : (m.match_type || m.type || '');
-      const tA_raw = isArray ? m[2] : (m.team_a_id || m.teamA);
-      const tB_raw = isArray ? m[3] : (m.team_b_id || m.teamB);
-      const ref_raw = isArray ? m[4] : (m.ref_team_id || m.ref);
-      const poolKey = isArray ? m[5] : (m.pool_id || m.poolId || m.pool || 'Unassigned');
-      const time = isArray ? m[6] : m.time;
-      const s1A = isArray ? m[7] : (m.s1a !== undefined ? m.s1a : m.s1A);
-      const s1B = isArray ? m[8] : (m.s1b !== undefined ? m.s1b : m.s1B);
-      const s2A = isArray ? m[9] : (m.s2a !== undefined ? m.s2a : m.s2A);
-      const s2B = isArray ? m[10] : (m.s2b !== undefined ? m.s2b : m.s2B);
-      const s3A = isArray ? m[11] : (m.s3a !== undefined ? m.s3a : m.s3A);
-      const s3B = isArray ? m[12] : (m.s3b !== undefined ? m.s3b : m.s3B);
-      const status = isArray ? m[13] : (m.status || 'Pending');
+        let t1Sets = 0;
+        let t2Sets = 0;
+        
+        // Strict Number parsing prevents alphabetical string comparisons (e.g. '9' > '25')
+        if (Number(match.s1A || 0) > Number(match.s1B || 0)) t1Sets++; else if (Number(match.s1B || 0) > Number(match.s1A || 0)) t2Sets++;
+        if (Number(match.s2A || 0) > Number(match.s2B || 0)) t1Sets++; else if (Number(match.s2B || 0) > Number(match.s2A || 0)) t2Sets++;
+        if (Number(match.s3A || 0) > Number(match.s3B || 0)) t1Sets++; else if (Number(match.s3B || 0) > Number(match.s3A || 0)) t2Sets++;
 
-      if (!tA_raw || !tB_raw) return;
-      
-      const teamAName = teamIdToName[tA_raw] || tA_raw;
-      const teamBName = teamIdToName[tB_raw] || tB_raw;
-      const refName = teamIdToName[ref_raw] || ref_raw || '-';
+        t1.setsWon += t1Sets;
+        t1.setsLost += t2Sets;
+        t2.setsWon += t2Sets;
+        t2.setsLost += t1Sets;
 
-      const isPoolMatch = mType.toLowerCase() === 'pool' || mType.toLowerCase() === 'pool play';
-      
-      const uiMatch = {
-         id: mId, time: time, status: status,
-         teamA: teamAName, teamB: teamBName, ref: refName,
-         s1A, s1B, s2A, s2B, s3A, s3B
-      };
+        t1.matchesPlayed++;
+        t2.matchesPlayed++;
 
-      if (isPoolMatch && standings[poolKey]) {
-          standings[poolKey].matches.push(uiMatch);
-      }
-
-      const isComplete = status === 'Complete' || status === 'Final';
-      if (!isComplete || !isPoolMatch) return;
-
-      if (!teamStats[teamAName]) teamStats[teamAName] = createEmptyStats(teamAName);
-      if (!teamStats[teamBName]) teamStats[teamBName] = createEmptyStats(teamBName);
-
-      let setsA = 0, setsB = 0, ptsA = 0, ptsB = 0;
-
-      const processSet = (sA, sB) => {
-        const scoreA = parseInt(sA, 10); const scoreB = parseInt(sB, 10);
-        if (!isNaN(scoreA) && !isNaN(scoreB)) {
-          ptsA += scoreA; ptsB += scoreB;
-          if (scoreA > scoreB) setsA++; else if (scoreB > scoreA) setsB++;
+        if (t1Sets > t2Sets) {
+            t1.matchesWon++;
+            t2.matchesLost++;
+        } else if (t2Sets > t1Sets) {
+            t2.matchesWon++;
+            t1.matchesLost++;
         }
-      };
 
-      processSet(s1A, s1B);
-      processSet(s2A, s2B);
-      
-      // BEST OF 3 LOGIC: Only count 3rd set if nobody has 2 wins yet
-      if (setsA < 2 && setsB < 2) {
-          processSet(s3A, s3B);
-      }
+        // Strict Number parsing prevents string concatenation (e.g. '25' + '25' = '25250')
+        const t1Points = Number(match.s1A || 0) + Number(match.s2A || 0) + Number(match.s3A || 0);
+        const t2Points = Number(match.s1B || 0) + Number(match.s2B || 0) + Number(match.s3B || 0);
 
-      teamStats[teamAName].setsWon += setsA; teamStats[teamAName].setsLost += setsB;
-      teamStats[teamAName].pointsFor += ptsA; teamStats[teamAName].pointsAgainst += ptsB;
-
-      teamStats[teamBName].setsWon += setsB; teamStats[teamBName].setsLost += setsA;
-      teamStats[teamBName].pointsFor += ptsB; teamStats[teamBName].pointsAgainst += ptsA;
-
-      if (setsA > setsB) {
-        teamStats[teamAName].wins++; teamStats[teamBName].losses++;
-      } else if (setsB > setsA) {
-        teamStats[teamBName].wins++; teamStats[teamAName].losses++;
-      }
-    });
-  }
-
-  Object.values(teamStats).forEach(st => {
-    st.pointDiff = st.pointsFor - st.pointsAgainst;
-    const poolKey = st.pool;
-    if (!standings[poolKey]) standings[poolKey] = { name: poolKey, site: '', teams: [], matches: [] };
-    standings[poolKey].teams.push(st);
-  });
-
-  Object.keys(standings).forEach(poolName => {
-    standings[poolName].teams.sort((a, b) => {
-      if (b.wins !== a.wins) return b.wins - a.wins;
-      const setDiffA = a.setsWon - a.setsLost; const setDiffB = b.setsWon - b.setsLost;
-      if (setDiffB !== setDiffA) return setDiffB - setDiffA;
-      if (b.pointDiff !== a.pointDiff) return b.pointDiff - a.pointDiff;
-      return b.pointsFor - a.pointsFor;
+        t1.pointsFor += t1Points;
+        t1.pointsAgainst += t2Points;
+        t2.pointsFor += t2Points;
+        t2.pointsAgainst += t1Points;
     });
 
-    standings[poolName].teams.forEach((t, i) => t.place = i + 1);
-    standings[poolName].teams.sort((a, b) => a.seed - b.seed);
-  });
+    standings.forEach(stats => {
+        stats.setDiff = stats.setsWon - stats.setsLost;
+        stats.pointDiff = stats.pointsFor - stats.pointsAgainst;
+    });
 
-  return standings;
+    return standings.sort((a, b) => {
+        if (b.matchesWon !== a.matchesWon) return b.matchesWon - a.matchesWon;
+        if (b.setDiff !== a.setDiff) return b.setDiff - a.setDiff;
+        if (b.pointDiff !== a.pointDiff) return b.pointDiff - a.pointDiff;
+        return a.seed - b.seed; 
+    });
 }
 
-export function getBracketData(activeDivision = "Gold", standings = {}, matches = []) {
-  const seedMap = {};
-  
-  if (standings && typeof standings === 'object') {
-    Object.keys(standings).forEach(poolKey => {
-      const pool = standings[poolKey];
-      const poolTeams = pool.teams || [];
-      const poolMatches = pool.matches || [];
+export function getAllPoolStandings() {
+    const pools = getPools();
+    const standingsByPool = {};
 
-      const pendingMatches = poolMatches.filter(m => {
-          const status = (m.status || '').toLowerCase();
-          return status !== 'complete' && status !== 'final';
-      }).length;
-
-      let canAssignSeeds = false;
-      if (pendingMatches === 0) {
-          canAssignSeeds = true; 
-      } else if (pendingMatches <= 2 && poolTeams.length >= 4) {
-          const sortedByRank = [...poolTeams].sort((a, b) => a.place - b.place);
-          let topTeamWins = sortedByRank[0]?.wins || 0;
-          let thirdTeamWins = sortedByRank[2]?.wins || 0;
-          
-          if (topTeamWins > thirdTeamWins + (pendingMatches * 1)) {
-              canAssignSeeds = true;
-          }
-      }
-
-      if (canAssignSeeds) {
-        const poolClean = poolKey.replace(/pool/i, '').trim().toLowerCase(); 
-        
-        poolTeams.forEach((team) => {
-          const rank = team.place; 
-          const ordinal = rank === 1 ? 'st' : rank === 2 ? 'nd' : rank === 3 ? 'rd' : 'th';
-          
-          seedMap[`pool ${poolClean} - ${rank}${ordinal}`] = team.name; 
-          seedMap[`pool ${poolClean} - ${rank}`] = team.name;          
-          seedMap[`pool ${poolClean} #${rank}`] = team.name;            
-        });
-      }
+    pools.forEach(pool => {
+        standingsByPool[pool.id] = getPoolStandings(pool.id);
     });
-  }
 
-  const divisionMatches = (matches || []).filter(m => {
-    const isArray = Array.isArray(m);
-    const mId = (isArray ? m[0] : m.id || '').toUpperCase();
-    if (activeDivision === 'Gold' && mId.startsWith('G')) return true;
-    if (activeDivision === 'Silver' && mId.startsWith('S')) return true;
-    return false;
-  });
-
-  const resolvedMatches = divisionMatches.map(m => {
-    const isArray = Array.isArray(m);
-    const mId = isArray ? m[0] : m.id;
-    const tA_raw = isArray ? m[2] : (m.team_a_id || m.teamA);
-    const tB_raw = isArray ? m[3] : (m.team_b_id || m.teamB);
-    const ref_raw = isArray ? m[4] : (m.ref_team_id || m.ref);
-    const time = isArray ? m[6] : m.time;
-    const s1A = isArray ? m[7] : (m.s1a !== undefined ? m.s1a : m.s1A);
-    const s1B = isArray ? m[8] : (m.s1b !== undefined ? m.s1b : m.s1B);
-    const s2A = isArray ? m[9] : (m.s2a !== undefined ? m.s2a : m.s2A);
-    const s2B = isArray ? m[10] : (m.s2b !== undefined ? m.s2b : m.s2B);
-    const s3A = isArray ? m[11] : (m.s3a !== undefined ? m.s3a : m.s3A);
-    const s3B = isArray ? m[12] : (m.s3b !== undefined ? m.s3b : m.s3B);
-    const status = isArray ? m[13] : (m.status || 'Pending');
-
-    let nameA = teamIdToName[tA_raw] || tA_raw;
-    let nameB = teamIdToName[tB_raw] || tB_raw;
-    
-    if (nameA && seedMap[nameA.toLowerCase()]) nameA = seedMap[nameA.toLowerCase()];
-    if (nameB && seedMap[nameB.toLowerCase()]) nameB = seedMap[nameB.toLowerCase()];
-
-    const matchIdString = (mId || '').toUpperCase();
-    let roundType = 'Matches';
-    
-    if (matchIdString.startsWith('GS') || matchIdString.startsWith('SS')) {
-        roundType = 'Seeding';
-    } else if (matchIdString === 'G1' || matchIdString === 'G2' || matchIdString === 'G3' || matchIdString === 'G4' || 
-               matchIdString === 'S1' || matchIdString === 'S2' || matchIdString === 'S3' || matchIdString === 'S4') {
-        roundType = 'Quarterfinals';
-    } else if (matchIdString === 'G5' || matchIdString === 'G6' || matchIdString === 'S5' || matchIdString === 'S6') {
-        roundType = 'Semifinals';
-    } else if (matchIdString === 'G7' || matchIdString === 'S7') {
-        roundType = 'Finals';
-    }
-
-    return {
-      id: mId,
-      type: roundType, 
-      time: time,
-      status: status,
-      teamA: nameA || 'TBD',
-      teamB: nameB || 'TBD',
-      ref: teamIdToName[ref_raw] || ref_raw || '-',
-      s1A, s1B, s2A, s2B, s3A, s3B
-    };
-  });
-
-  return { division: activeDivision, matches: resolvedMatches };
+    return standingsByPool;
 }

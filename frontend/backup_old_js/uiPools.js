@@ -15,7 +15,7 @@ export function renderPools(standingsData) {
     html += `
       <div class="data-card" style="overflow: hidden;">
         <div class="card-header" style="background-color: ${siteColor}; color: #FFFFFF; border-bottom: none;">
-          <span>🏐 ${poolName}</span>
+          <span>🏐 ${pool.name || poolName}</span>
           <span style="font-size: 0.75rem; font-weight: normal;">${pool.site || ''}</span>
         </div>
         
@@ -53,35 +53,43 @@ export function renderPools(standingsData) {
       let diffStyleSet = setDiff > 0 ? "color: var(--text-primary); font-weight: 600;" : "color: var(--text-secondary); font-weight: normal;";
       let diffStylePt = team.pointDiff > 0 ? "color: var(--text-primary); font-weight: 600;" : "color: var(--text-secondary); font-weight: normal;";
 
-      const logoHTML = team.logoId 
-        ? `<img src="https://lh3.googleusercontent.com/d/${team.logoId}" style="width: 25px; height: 25px; object-fit: contain; flex-shrink: 0; margin-right: 8px;">`
+      const logoUrl = team.logo_id || team.logoId; // Catch both formats just in case
+      const logoHTML = logoUrl 
+        ? `<img src="${logoUrl}" style="width: 25px; height: 25px; object-fit: contain; flex-shrink: 0; margin-right: 8px;" alt="${team.name} logo">`
         : `<div style="width: 25px; height: 25px; background: var(--surface-lighter); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: bold; color: var(--text-secondary); flex-shrink: 0; margin-right: 8px;">?</div>`;
-        
-      const displayColor = lightenColor(team.color, 0.4);
+      
+        const displayColor = lightenColor(team.color, 0.4);
 
-      // GENERATE THE FINISH BADGE
+      // GENERATE THE SLEEK LEFT-EDGE FINISH BADGE
       let finishBadge = '';
       if (team.place) {
-          let badgeColor = '';
-          if (team.place === 1) badgeColor = '#D4AF37'; // Gold
-          else if (team.place === 2) badgeColor = '#94A3B8'; // Silver
-          else if (team.place === 3) badgeColor = '#B08D57'; // Bronze
-          else badgeColor = 'var(--surface-lighter)'; // 4th
+          let badgeColor = team.place === 1 ? '#D4AF37' : team.place === 2 ? '#94A3B8' : team.place === 3 ? '#B08D57' : 'var(--surface-lighter)';
+          let textColor = team.place === 4 ? 'var(--text-secondary)' : '#FFF';
+          
+          // Floating circle with just the number, overlapping the left edge
+          finishBadge = `<div style="position: absolute; left: -2px; top: 50%; transform: translateY(-50%); background-color: ${badgeColor}; color: ${textColor}; font-size: 0.7rem; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: bold; box-shadow: 1px 1px 3px rgba(0,0,0,0.5); z-index: 2;">${team.place}</div>`;
+      }
 
+      // GENERATE THE INLINE FINISH BADGE OR SHOW SEED
+      let seedDisplay = team.seed !== 99 ? team.seed : '-';
+      
+      if (team.place) {
+          let badgeColor = team.place === 1 ? '#D4AF37' : team.place === 2 ? '#94A3B8' : team.place === 3 ? '#B08D57' : 'var(--surface-lighter)';
           let textColor = team.place === 4 ? 'var(--text-secondary)' : '#FFF';
           let ordinal = team.place === 1 ? 'st' : team.place === 2 ? 'nd' : team.place === 3 ? 'rd' : 'th';
           
-          // FIX: Moved to the left with a fixed width (28px) for perfect column alignment
-          finishBadge = `<span style="background-color: ${badgeColor}; color: ${textColor}; font-size: 0.65rem; padding: 2px 0; width: 28px; text-align: center; border-radius: 12px; font-weight: bold; margin-right: 8px; flex-shrink: 0;">${team.place}${ordinal}</span>`;
+          // Replaces the plain seed number with a compact, centered badge
+          seedDisplay = `<div style="background-color: ${badgeColor}; color: ${textColor}; font-size: 0.65rem; padding: 3px 0; width: 26px; text-align: center; border-radius: 4px; font-weight: bold; margin: 0 auto;">${team.place}${ordinal}</div>`;
       }
 
-      // FIX: Added text-overflow: ellipsis to truncate super long names
+      // FIX: The badge is now safely inline, and we removed the absolute positioning.
       html += `
               <tr>
-                <td style="color: var(--text-secondary); font-size: 0.75rem; width: 25px; text-align: center;">${team.seed !== 99 ? team.seed : '-'}</td>
-                <td style="max-width: 140px;">
+                <td style="color: var(--text-secondary); font-size: 0.75rem; width: 35px; text-align: center; padding: 0 4px; vertical-align: middle;">
+                    ${seedDisplay}
+                </td>
+                <td style="max-width: 175px;">
                   <div class="team-name-wrapper" style="display: flex; align-items: center;">
-                    ${finishBadge}
                     ${logoHTML}
                     <span style="color: ${displayColor}; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${team.name}">${team.name}</span>
                   </div>

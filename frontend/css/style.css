@@ -16,6 +16,14 @@ body {
   margin: 0;
   padding: 0;
   -webkit-font-smoothing: antialiased;
+  animation: appFadeIn 0.5s ease-in-out; /* ADD THIS LINE */
+}
+
+/* Keeps the app hidden for a split second to let Supabase load colors */
+@keyframes appFadeIn {
+  0% { opacity: 0; }
+  40% { opacity: 0; } 
+  100% { opacity: 1; }
 }
 
 /* --- Mobile-First Navigation --- */
@@ -42,11 +50,12 @@ body {
 }
 
 .admin-btn {
-  background-color: rgba(255, 95, 0, 0.1);
+  /* Mixes your theme color with 90% transparency */
+  background-color: color-mix(in srgb, var(--accent-orange) 10%, transparent);
   color: var(--accent-orange);
   border: 1px solid var(--accent-orange);
   padding: 4px 12px;
-  border-radius: 20px; /* Pill shape */
+  border-radius: 20px;
   text-decoration: none;
   font-size: 0.75rem;
   font-weight: bold;
@@ -88,7 +97,7 @@ body {
 /* --- View Management & Mobile Padding --- */
 #app-container {
   padding: 15px;
-  max-width: 1600px; /* Widened from 800px to allow side-by-side cards */
+  max-width: 1600px;
   margin: 0 auto;
   padding-bottom: 50px;
 }
@@ -96,12 +105,73 @@ body {
 /* Responsive Grid for Pools */
 .pools-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); /* Side-by-side on PC, stacked on phone */
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
   gap: 20px;
-  align-items: start; /* Prevents cards from stretching vertically */
+  align-items: start;
 }
 
-/* FIXED: Wrapper class keeps flexbox INSIDE the cell so table borders go edge-to-edge */
+/* Landing View Tournament Directory Cards */
+.tournament-card {
+  background: var(--surface-dark);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 16px;
+  text-decoration: none;
+  color: var(--text-primary);
+  flex: 1 1 280px;
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+.tournament-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--accent-orange);
+  /* Casts a shadow using your dynamic theme color */
+  box-shadow: 0 8px 15px color-mix(in srgb, var(--accent-orange) 15%, transparent);
+}
+
+.tournament-card-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.tournament-card-header h4 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.status-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: var(--surface-lighter);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge.active {
+  /* Creates a faded background badge to match the text */
+  background: color-mix(in srgb, var(--accent-orange) 20%, transparent);
+  color: var(--accent-orange);
+  border: 1px solid var(--accent-orange);
+}
+
+.tournament-card-detail {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+/* Table Wrapper for Team Logos & Names */
 .team-name-wrapper {
   display: flex;
   align-items: center;
@@ -127,7 +197,7 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* --- Public Data Cards (Ready for future views) --- */
+/* --- Public Data Cards --- */
 .data-card {
   background: var(--surface-dark);
   border: 1px solid var(--border-color);
@@ -147,7 +217,7 @@ body {
   align-items: center;
 }
 
-/* --- Public Standings & Breakdown Tables --- */
+/* --- Standings & Breakdown Tables --- */
 .standings-table, .breakdown-table {
   width: 100%;
   border-collapse: collapse;
@@ -189,8 +259,8 @@ body {
 /* --- Public Brackets --- */
 .bracket-window {
   width: 100%;
-  height: 65vh; /* Takes up most of the phone screen */
-  background-color: #0B1120; /* Deepest dark for contrast */
+  height: 65vh;
+  background-color: #0B1120;
   border: 1px solid var(--border-color);
   border-radius: 8px;
   overflow: hidden;
@@ -203,9 +273,9 @@ body {
 
 .bracket-canvas {
   position: absolute;
-  top: 20px;          /* Forces it to the top */
+  top: 20px;
   left: 20px;
-  transform-origin: top left;  /* Zooms from the top left corner */
+  transform-origin: top left;
   display: flex;
   align-items: center;
   gap: 50px;
@@ -260,9 +330,9 @@ body {
   margin-top: 15px;
 }
 
-/* Base Card Styling */
+/* Base Match Card Styling */
 .match-card {
-  background-color: #1C2541; /* Deep slate */
+  background-color: #1C2541;
   border-radius: 8px;
   padding: 12px;
   width: 260px;
@@ -270,15 +340,13 @@ body {
   box-shadow: 0 4px 6px rgba(0,0,0,0.3);
 }
 
-/* Round Headers */
 .round-title {
-  color: #FF7300; /* Vibrant orange */
+  color: var(--accent-orange);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 1px;
 }
 
-/* Team Row & Winner Highlight */
 .team-row {
   display: flex;
   justify-content: space-between;
@@ -286,14 +354,13 @@ body {
   padding: 8px 12px;
   margin: 4px 0;
   border-radius: 6px;
-  border: 1px solid transparent; /* Prevents layout shift */
+  border: 1px solid transparent;
 }
 
 .team-row.winner {
-  border: 1px solid #FF7300; /* Orange border for winners */
+  border: 1px solid var(--accent-orange);
 }
 
-/* Ref Duty Footer */
 .ref-duty {
   border-top: 1px dashed #4A5568;
   margin-top: 10px;
@@ -304,5 +371,193 @@ body {
 }
 
 .ref-duty .assigned {
-  color: #FF7300;
+  color: var(--accent-orange);
+}
+
+/* --- QUILL EDITOR TEXT TIGHTENING --- */
+.info-content-box p {
+    margin: 0 0 6px 0 !important; /* Removes top margin, leaves a tiny gap below */
+}
+
+.info-content-box ul, 
+.info-content-box ol {
+    margin: 0 0 6px 0 !important;
+    padding-left: 20px !important; /* Keeps bullets aligned */
+}
+
+.info-content-box li {
+    margin-bottom: 2px !important; /* Squeezes bullet points closer together */
+}
+
+/* Removes the extra gap from the very last item in the box */
+.info-content-box p:last-child,
+.info-content-box ul:last-child,
+.info-content-box ol:last-child {
+    margin-bottom: 0 !important; 
+}
+
+/* --- QUILL EDITOR DARK MODE PREVIEW --- */
+
+/* 1. Keep the toolbar light so the black icons are visible */
+.ql-toolbar.ql-snow {
+    background-color: #f3f4f6 !important; 
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-color: var(--border-color) !important;
+}
+
+/* 2. Make the typing area dark to match the public cards */
+.ql-container.ql-snow {
+    background-color: var(--surface-dark) !important;
+    color: var(--text-secondary) !important;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+    border-color: var(--border-color) !important;
+    font-family: inherit !important;
+    min-height: 120px; /* Gives you plenty of room to type */
+}
+
+/* 3. Adjust the default placeholder text color so it's readable */
+.ql-editor.ql-blank::before {
+    color: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* --- QUILL DROPDOWN UI FIX (Shows the numerical sizes) --- */
+.ql-snow .ql-picker.ql-size .ql-picker-label::before { content: 'Size' !important; }
+.ql-snow .ql-picker.ql-size .ql-picker-label[data-value]::before,
+.ql-snow .ql-picker.ql-size .ql-picker-item[data-value]::before {
+    content: attr(data-value) !important;
+}
+
+/* --- THE RED ALERT BOX (Hijacked Header 6 - H6) --- */
+.info-content-box h6 {
+    background-color: rgba(191, 42, 57, 0.15) !important;
+    border: 1px solid rgba(191, 42, 57, 0.5) !important;
+    border-radius: 6px;
+    padding: 12px 15px !important;
+    margin: 10px 0 !important;
+    color: var(--text-primary) !important;
+    font-weight: bold;
+    text-align: center;
+    font-size: 1rem; /* Prevents it from acting like a massive header */
+}
+
+/* --- THE ORANGE SUB-BOX (Blockquote) --- */
+.info-content-box blockquote {
+    background-color: rgba(0, 0, 0, 0.2) !important; 
+    border-left: 4px solid var(--accent-orange) !important; 
+    border-right: none !important; border-top: none !important; border-bottom: none !important;
+    padding: 12px 15px !important;
+    margin: 10px 0 !important;
+    color: var(--text-secondary);
+    border-radius: 0 4px 4px 0;
+    text-align: left;
+}
+
+/* --- MAKE THE RED ALERT BUTTON VISIBLE --- */
+.ql-snow .ql-toolbar button.ql-header[value="6"]::after {
+    content: "🚨";
+    font-size: 14px;
+    display: block;
+    line-height: 18px;
+}
+.ql-snow .ql-toolbar button.ql-header[value="6"]:hover::after {
+    transform: scale(1.1);
+}
+
+/* --- AUTO-FUSE ADJACENT ORANGE BOXES --- */
+.info-content-box blockquote {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    border-radius: 0 !important;
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+}
+
+/* Add spacing and rounded corners to the FIRST box in a row */
+.info-content-box *:not(blockquote) + blockquote,
+.info-content-box blockquote:first-child {
+    margin-top: 10px !important;
+    padding-top: 12px !important;
+    border-top-right-radius: 4px !important;
+}
+
+/* Add spacing and rounded corners to the LAST box in a row */
+.info-content-box blockquote:not(:has(+ blockquote)) {
+    margin-bottom: 10px !important;
+    padding-bottom: 12px !important;
+    border-bottom-right-radius: 4px !important;
+}
+
+/* --- QUILL ALIGNMENT FIX --- */
+.info-content-box .ql-align-center { text-align: center !important; }
+.info-content-box .ql-align-right { text-align: right !important; }
+.info-content-box .ql-align-justify { text-align: justify !important; }
+
+/* --- SORTABLE JS DRAG STATE --- */
+.sortable-ghost {
+    opacity: 0.4;
+    background-color: var(--surface-light);
+}
+
+/* --- FIX QUILL DROPDOWN SCROLLING --- */
+.ql-snow .ql-picker-options {
+    max-height: 200px !important;
+    overflow-y: auto !important;
+}
+
+/* Style for all dropdowns and time inputs */
+select, 
+input[type="time"] {
+    background-color: #1e293b; /* Dark slate background */
+    color: #f1f5f9; /* Light text */
+    border: 1px solid #475569; /* Subtle border to define the edges */
+    border-radius: 4px; /* Slight rounding for a modern feel */
+    padding: 6px 12px;
+    outline: none;
+}
+
+/* Add a subtle glow when clicking on the dropdowns/inputs */
+select:focus, 
+input[type="time"]:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+}
+
+/* Style for the Auto-Generate Button */
+.auto-generate-btn {
+    background-color: #334155; /* Neutral dark button */
+    color: #ffffff;
+    border: 1px solid #475569;
+    border-radius: 4px;
+    padding: 6px 16px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s ease-in-out;
+}
+
+/* Hover effect for the button */
+.auto-generate-btn:hover {
+    background-color: #475569; /* Slightly lighter on hover */
+}
+
+/* Create a responsive grid for the pool cards */
+#adminMatchGrid {
+    display: grid;
+    /* This tells the grid to fit as many 450px columns as possible */
+    grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+    gap: 20px;
+    align-items: start; /* Prevents cards from stretching vertically */
+}
+
+/* Condense the vertical space inside the rows */
+.match-row {
+    margin-bottom: 8px !important; 
+}
+
+/* Tighten up the dropdowns and inputs */
+.match-row select, 
+.match-row input {
+    padding: 4px 8px !important;
+    font-size: 0.85rem;
 }

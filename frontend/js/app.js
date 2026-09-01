@@ -1,120 +1,188 @@
-// --- 1. IMPORTS ---
-import { fetchDatabase, submitScoreUpdate } from './api.js';
-import { openScoreModal, closeScoreModal } from './uiModal.js';
-import { initBracketPanZoom, renderBracket } from './uiBracket.js';
+// app.js
+import { supabase } from './supabaseClient.js';
+import { getTournamentId, setTournamentId, setTournamentData, setCurrentView } from './state.js';
+import { initAuth } from './adminAuth.js';
+import { initPools, loadTeams } from './adminPools.js';
+import { initSchedule, loadSchedule } from './adminSchedule.js';
+import { initEditor, loadTournamentInfo } from './adminInfo.js';
+import { initScores } from './adminScores.js';
 import { populateTeamDropdown, renderMyTeam } from './uiTeam.js';
-import { getStandingsData, getBracketData } from './uiMath.js';
-import { renderPools } from './uiPools.js';
-import { attemptAdminLogin, closeAdminLogin, submitAdminLogin, logoutAdmin, switchAdminSubView, adminAddPool, adminAddTeam } from './uiAdmin.js';
+import { renderPublicInfo, renderPublicPools } from './uiPublic.js';
+import { initManagePools, loadPoolScores } from './adminManagePools.js';
+import { renderBracketView, initBracketAdmin } from './uiBracket.js';
 
-
-// --- 2. GLOBAL STATE ---
-export let globalStandings = null;
-export let globalBracketsGold = null;
-export let globalBracketsSilver = null;
-
-// --- 3. VIEW NAVIGATION ---
+// --- VIEW NAVIGATION (ROUTER) ---
 export function switchView(viewId) {
-  // 1. Hide all views by resetting classes AND inline styles
-  const views = document.querySelectorAll('.view-section');
-  views.forEach(v => {
-    v.classList.remove('active');
-    v.style.display = 'none'; 
-  });
+    const views = document.querySelectorAll('.view-section');
+    views.forEach(v => {
+        v.classList.remove('active');
+        v.style.display = 'none'; 
+    });
   
-  // 2. Remove the active highlight from ALL navigation buttons
-  const navButtons = document.querySelectorAll('.nav-btn');
-  navButtons.forEach(btn => btn.classList.remove('active'));
+    const navButtons = document.querySelectorAll('.nav-btn');
+    navButtons.forEach(btn => btn.classList.remove('active'));
   
-  // 3. Show the target view and force the display style
-  const targetView = document.getElementById(viewId);
-  if (targetView) {
-    targetView.classList.add('active');
-    
-    // Brackets need flexbox, everything else uses block
+    const targetView = document.getElementById(viewId);
+    if (targetView) {
+        targetView.classList.add('active');
+        targetView.style.display = 'block'; 
+    }
+
+    const targetBtn = document.getElementById('btn-' + viewId);
+    if (targetBtn) {
+        targetBtn.classList.add('active');
+    }
+
+    setCurrentView(viewId);
+
     if (viewId === 'bracketsView') {
-      targetView.style.display = 'flex';
-      targetView.style.flexDirection = 'column'; 
-    } else {
-      targetView.style.display = 'block'; 
+        renderBracketView();
     }
-  }
-
-  // 4. Add the active highlight to the button you just clicked
-  const targetBtn = document.getElementById('btn-' + viewId);
-  if (targetBtn) {
-    targetBtn.classList.add('active');
-  }
-
-  // 5. Fetch fresh data from Supabase if we aren't just reading the Info tab
-  if (viewId !== 'infoView') {
-    silentRefresh();
-  }
 }
 
-// --- 4. EXPOSE TO HTML ---
+// --- ADMIN SUB-VIEW NAVIGATION ---
+export function switchAdminView(subViewId) {
+    const subViews = document.querySelectorAll('.admin-sub-view');
+    subViews.forEach(v => v.style.display = 'none');
+    
+    const adminNavBtns = document.querySelectorAll('#adminView .nav-btn:not(#btn-adminLogout)');
+    adminNavBtns.forEach(btn => btn.classList.remove('active'));
+    
+    const target = document.getElementById(subViewId);
+    if (target) target.style.display = 'block';
+    
+    const targetBtn = document.getElementById('btn-' + subViewId);
+    if (targetBtn) targetBtn.classList.add('active');
+}
+
+// --- LOAD TOURNAMENT DIRECTORY (LANDING PAGE) ---
+export async function loadTournamentDirectory() {
+    const container = document.getElementById('tournamentDirectory');
+    if (!container) return;
+
+    try {
+        const { data: tournaments, error } = await supabase
+            .from('tournaments')
+            .select('*')
+            .in('status', ['published', 'active', 'completed']);
+
+        if (error) throw error;
+
+        if (!tournaments || tournaments.length === 0) {
+            container.innerHTML = '<p style="color: var(--text-secondary);">No active tournaments scheduled yet.</p>';
+            return;
+        }
+
+        container.innerHTML = '';
+        tournaments.forEach(t => {
+            const card = document.createElement('a');
+            card.href = `?t=${encodeURIComponent(t.slug)}`; 
+            card.className = 'tournament-card';
+            card.style.cssText = 'display: block; background: var(--surface-dark); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; text-decoration: none; color: inherit; min-width: 250px;';
+            
+            let displayStatus = t.status === 'published' ? 'Upcoming' : t.status;
+            displayStatus = displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1);
+
+            card.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <span style="font-size: 0.75rem; padding: 3px 8px; border-radius: 12px; background: ${t.status === 'active' ? 'var(--accent-orange)' : 'rgba(255,255,255,0.1)'}; color: white; font-weight: bold;">${displayStatus}</span>
+                </div>
+                <h4 style="margin: 0 0 10px 0; color: var(--text-primary); font-size: 1.1rem;">${t.name}</h4>
+                <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">📅 ${t.date || 'TBD'}</p>
+                <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: var(--text-secondary);">📍 ${t.location || 'TBD'}</p>
+            `;
+            container.appendChild(card);
+        });
+    } catch (err) {
+        console.error('Error loading tournament directory:', err);
+        container.innerHTML = '<p style="color: var(--text-secondary);">Unable to load live events at this time.</p>';
+    }
+}
+
+// --- ATTACH TO WINDOW FOR HTML ONCLICK ALERTS ---
 window.switchView = switchView;
-window.openScoreModal = openScoreModal;
-window.closeScoreModal = closeScoreModal;
-window.submitScoreUpdate = () => submitScoreUpdate(silentRefresh); 
-window.loadPoolData = () => silentRefresh();
-window.loadBracketData = () => silentRefresh();
-window.renderMyTeam = () => renderMyTeam();
-window.attemptAdminLogin = attemptAdminLogin;
-window.closeAdminLogin = closeAdminLogin;
-window.submitAdminLogin = submitAdminLogin;
-window.logoutAdmin = logoutAdmin;
-window.switchAdminSubView = switchAdminSubView;
-window.adminAddPool = adminAddPool;
-window.adminAddTeam = adminAddTeam;
+window.renderMyTeam = renderMyTeam;
 
-// --- 5. SILENT POLLER & UI REFRESH ---
-export async function silentRefresh() {
-  const db = await fetchDatabase();
-  
-  // A. Always calculate Standings
-  if (typeof getStandingsData === 'function') {
-    globalStandings = getStandingsData(db.pools, db.teams, db.matches);
-  }
-  
-  // B. NEW: Always calculate Brackets in the background so My Team can read them!
-  if (typeof getBracketData === 'function') {
-      globalBracketsGold = getBracketData("Gold", globalStandings, db.matches);
-      globalBracketsSilver = getBracketData("Silver", globalStandings, db.matches);
-  }
+window.attemptAdminLogin = () => {
+    document.getElementById('adminLoginModal').style.display = 'flex';
+};
+document.getElementById('closeAdminLoginBtn')?.addEventListener('click', () => {
+    document.getElementById('adminLoginModal').style.display = 'none';
+});
 
-  const poolsView = document.getElementById('poolsView');
-  const teamView = document.getElementById('teamView');
-  const bracketsView = document.getElementById('bracketsView');
+// --- APP INITIALIZATION ---
+document.addEventListener('DOMContentLoaded', async () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tournamentSlug = urlParams.get('t');
 
-  // Pools View
-  if (poolsView && poolsView.classList.contains('active') && typeof renderPools === 'function') {
-    renderPools(globalStandings);
-  } 
-  
-  // Team View
-  else if (teamView && teamView.classList.contains('active')) {
-    populateTeamDropdown();
-    renderMyTeam();
-  }
+    if (tournamentSlug) {
+        document.getElementById('mainNav').style.display = 'flex';
 
-  // Brackets View
-  if (bracketsView && bracketsView.classList.contains('active')) {
-    const filter = document.getElementById('publicBracketFilter');
-    const activeDivision = filter ? filter.value : "Gold";
-    
-    // Pull from the globals we just calculated above
-    const bracketData = activeDivision === "Gold" ? globalBracketsGold : globalBracketsSilver;
-    
-    if (typeof renderBracket === 'function') {
-      renderBracket(bracketData);
+        // THE FIX: Changed to select('*') to grab all configuration columns
+        const { data, error } = await supabase
+            .from('tournaments')
+            .select('*') 
+            .eq('slug', tournamentSlug)
+            .single();
+
+        if (data && !error) {
+            setTournamentId(data.id);
+            setTournamentData(data); 
+            
+            document.getElementById('app-header-title').innerText = data.name;
+            if (data.theme_color) {
+                document.documentElement.style.setProperty('--accent-orange', data.theme_color);
+            }
+            
+            console.log("App Initialized. Active Tournament ID:", data.id);
+        } else {
+            console.error("Could not locate tournament by slug.");
+        }
     }
-  }
-}
 
-// --- 6. INITIALIZE APP ---
-document.addEventListener("DOMContentLoaded", () => {
-  switchView('infoView');
-  initBracketPanZoom();
-  setInterval(silentRefresh, 60000);
+    // Wire up Admin Sub-navigation buttons
+    document.getElementById('btn-adminInfo')?.addEventListener('click', () => switchAdminView('adminInfo'));
+    document.getElementById('btn-adminSetup')?.addEventListener('click', () => switchAdminView('adminSetup'));
+    document.getElementById('btn-adminSchedule')?.addEventListener('click', () => switchAdminView('adminSchedule'));
+    document.getElementById('btn-adminStandings')?.addEventListener('click', () => {
+        switchAdminView('adminStandings');
+        loadPoolScores(); 
+    });
+    document.getElementById('btn-adminBrackets')?.addEventListener('click', () => switchAdminView('adminBrackets'));
+    
+    // NEW: Wire up the Bracket Scores button WITH A DELAY to fix the canvas rendering bug
+    document.getElementById('btn-adminBracketScores')?.addEventListener('click', () => {
+        switchAdminView('adminBracketScores');
+        
+        // This tiny 10ms delay gives the browser time to paint the new tab 
+        // before we try to mathematically calculate and draw the brackets.
+        setTimeout(() => {
+            if (typeof renderBracketView === 'function') {
+                renderBracketView();
+            }
+        }, 10);
+    });
+    
+    initAuth();
+    initPools();
+    initSchedule();
+    initEditor();
+    initScores();
+    initManagePools();
+    initBracketAdmin();
+    
+    if (getTournamentId()) {
+        switchView('infoView'); 
+        await Promise.all([
+            loadTeams(),
+            loadSchedule(),
+            loadTournamentInfo()
+        ]);
+        populateTeamDropdown();
+        
+        renderPublicInfo();
+        renderPublicPools();
+    } else if (!tournamentSlug) {
+        loadTournamentDirectory();
+    }
 });

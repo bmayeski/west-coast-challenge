@@ -43,24 +43,3 @@ export function formatTime(timeString) {
   
   return `${hours}:${minuteStr} ${ampm}`;
 }
-
-// Add this to the bottom of utils.js
-export function ensureReadableColor(colorHex) {
-    if (!colorHex || !colorHex.includes('#')) return '#F8FAFC';
-    
-    // Convert hex to RGB
-    let num = parseInt(colorHex.replace('#', ''), 16);
-    let r = (num >> 16) & 0xFF;
-    let g = (num >> 8) & 0xFF;
-    let b = num & 0xFF;
-    
-    // Calculate perceived brightness (luminance)
-    let luma = 0.2126 * r + 0.7152 * g + 0.0722 * b; 
-    
-    // If the color is too dark for a navy background, lighten it by 45%
-    if (luma < 90) {
-        return lightenColor(colorHex, 0.45);
-    }
-    
-    return colorHex; // Otherwise, leave it exactly as is!
-}

@@ -1,285 +1,491 @@
-import { lightenColor, formatTime } from './utils.js';
-import { globalStandings, globalBracketsGold, globalBracketsSilver } from './app.js';
+// uiTeam.js
+import { getTeams, getMatches, getPools, getTournamentData } from './state.js';
+import { getAllPoolStandings } from './uiMath.js';
+import { ensureReadableColor } from './utils.js';
+
+// --- TIME FORMATTERS ---
+const formatBracketTime = (startTime, durationMinutes, offsetMultiplier) => {
+    if (!startTime) return 'TBD';
+    const [hours, minutes] = startTime.split(':').map(Number);
+    const date = new Date();
+    date.setHours(hours, minutes + (durationMinutes * offsetMultiplier), 0);
+    let h = date.getHours();
+    const m = date.getMinutes().toString().padStart(2, '0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return `${h}:${m} ${ampm}`;
+};
+
+const formatPoolTime = (timeStr) => {
+    if (!timeStr) return 'TBD';
+    const parts = timeStr.split(':');
+    if (parts.length < 2) return timeStr;
+    let h = parseInt(parts[0], 10);
+    const m = parts[1];
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return `${h}:${m} ${ampm}`;
+};
 
 export function populateTeamDropdown() {
-    const select = document.getElementById('myTeamSelect');
-    if (!select || !globalStandings) return;
+    const teamSelect = document.getElementById('myTeamSelect');
+    if (!teamSelect) return;
+
+    const teams = getTeams();
+    teamSelect.innerHTML = '<option value="">-- Select a Team --</option>';
     
-    const currentSelection = select.value;
-    select.innerHTML = '<option value="">-- Select a Team --</option>';
+    const sortedTeams = [...teams].sort((a, b) => a.name.localeCompare(b.name));
     
-    let allTeams = [];
-    Object.keys(globalStandings).forEach(poolKey => {
-        globalStandings[poolKey].teams.forEach(t => allTeams.push(t));
+    sortedTeams.forEach(team => {
+        const option = document.createElement('option');
+        option.value = team.id;
+        option.textContent = team.name;
+        teamSelect.appendChild(option);
     });
-    
-    allTeams.sort((a,b) => a.name.localeCompare(b.name)); 
-    
-    allTeams.forEach(t => {
-        let isSelected = (t.name === currentSelection) ? 'selected' : '';
-        select.innerHTML += `<option value="${t.name}" ${isSelected}>${t.name}</option>`;
-    });
+
+    if (!teamSelect.dataset.listenerAttached) {
+        teamSelect.addEventListener('change', (e) => renderMyTeam(e.target.value));
+        teamSelect.dataset.listenerAttached = 'true';
+    }
 }
 
-export function renderMyTeam() {
-    const select = document.getElementById('myTeamSelect');
-    const teamName = select ? select.value : null;
+export function renderMyTeam(teamId) {
     const content = document.getElementById('myTeamContent');
-    
-    if (!teamName) { 
-       if (content) content.innerHTML = '<p style="color: var(--text-secondary); text-align: center; margin-top: 40px;">Select a team from the dropdown above to view their dashboard.</p>'; 
-       return; 
+    if (!content) return;
+
+    if (!teamId) {
+        content.innerHTML = '';
+        return;
     }
 
-    let myTeam = null;
-    let myPool = null;
+    const teams = getTeams();
+    const team = teams.find(t => t.id === teamId);
+    if (!team) return;
 
-    Object.keys(globalStandings).forEach(poolKey => {
-        let found = globalStandings[poolKey].teams.find(t => t.name === teamName);
-        if (found) { myTeam = found; myPool = globalStandings[poolKey]; }
-    });
+    const rawColor = team.color || '#F26922';
+    const teamColor = typeof ensureReadableColor === 'function' ? ensureReadableColor(rawColor) : rawColor;
+    content.style.setProperty('--accent-orange', teamColor);
 
-    if (!myTeam) return;
+    const pools = getPools();
+    const matches = getMatches();
+    const standingsByPool = getAllPoolStandings();
+    const tournamentData = getTournamentData();
 
-    let displayColor = lightenColor(myTeam.color, 0.4); 
-    const logoHTML = myTeam.logoId ? `<img src="https://lh3.googleusercontent.com/d/${myTeam.logoId}" style="width: 50px; height: 50px; object-fit: contain;">` : '';
+    // 1. CALCULATE POOL RECORD
+    let poolMatchWins = 0, poolMatchLosses = 0, poolSetWins = 0, poolSetLosses = 0;
+    let poolName = 'Unknown Pool';
+    let location = tournamentData?.location || 'TBD';
 
-    let bracketWins = 0; let bracketLosses = 0;
-    let bracketSetsWon = 0; let bracketSetsLost = 0;
-    let bracketMatches = [];
-    let playedBracketMatches = []; 
-
-    [...(globalBracketsGold?.matches || []), ...(globalBracketsSilver?.matches || [])].forEach(m => {
-        if (m && (m.teamA === myTeam.name || m.teamB === myTeam.name || m.ref === myTeam.name)) {
-            bracketMatches.push(m);
-            
-            if (m.teamA === myTeam.name || m.teamB === myTeam.name) {
-                playedBracketMatches.push(m);
+    let myStanding = null;
+    for (const [pId, standings] of Object.entries(standingsByPool)) {
+        const found = standings.find(t => t.id === teamId);
+        if (found) {
+            myStanding = found;
+            const p = pools.find(pool => pool.id === pId);
+            if (p) {
+                poolName = p.name;
+                location = p.location || location;
             }
-            
-            let isComplete = m.status === 'Complete' || m.status === 'Final';
-            if (isComplete && (m.teamA === myTeam.name || m.teamB === myTeam.name)) {
-                let setsA = 0; let setsB = 0;
-                if (m.s1A !== "" && m.s1B !== "") { parseInt(m.s1A) > parseInt(m.s1B) ? setsA++ : setsB++; }
-                if (m.s2A !== "" && m.s2B !== "") { parseInt(m.s2A) > parseInt(m.s2B) ? setsA++ : setsB++; }
-                if (setsA < 2 && setsB < 2 && m.s3A !== "" && m.s3B !== "") { parseInt(m.s3A) > parseInt(m.s3B) ? setsA++ : setsB++; }
-                
-                if (m.teamA === myTeam.name) {
-                    bracketSetsWon += setsA; bracketSetsLost += setsB;
-                    if (setsA > setsB) bracketWins++; else if (setsB > setsA) bracketLosses++;
-                } else {
-                    bracketSetsWon += setsB; bracketSetsLost += setsA;
-                    if (setsB > setsA) bracketWins++; else if (setsA > setsB) bracketLosses++;
-                }
-            }
+            break;
         }
-    });
-
-    let poolFinishText = '';
-    if (myTeam.place) {
-        let ordinal = myTeam.place === 1 ? 'st' : myTeam.place === 2 ? 'nd' : myTeam.place === 3 ? 'rd' : 'th';
-        poolFinishText = `${myTeam.place}${ordinal} Place`;
     }
 
-    let division = "";
-    if (globalBracketsGold?.matches?.some(m => m.teamA === myTeam.name || m.teamB === myTeam.name)) division = "Gold";
-    else if (globalBracketsSilver?.matches?.some(m => m.teamA === myTeam.name || m.teamB === myTeam.name)) division = "Silver";
-    
-    let playoffFinishText = division ? `${division} Bracket` : "TBD";
-    
-    if (division && playedBracketMatches.length > 0) {
-        const depthMap = { 'Seeding': 1, 'Quarterfinals': 2, 'Semifinals': 3, 'Finals': 4 };
-        let maxDepth = 0;
-        let deepestMatch = null;
+    if (myStanding) {
+        poolMatchWins = myStanding.matchesWon || 0;
+        poolMatchLosses = (myStanding.matchesPlayed || 0) - poolMatchWins;
+        poolSetWins = myStanding.setsWon || 0;
+        poolSetLosses = myStanding.setsLost || 0;
+    }
+
+    // 2. RESOLVE BRACKET MATCHES & CALCULATE BRACKET RECORD
+    const config = tournamentData?.bracket_config || { start: '13:00', duration: 60 };
+    const savedScores = tournamentData?.bracket_scores || {};
+    const hasSeeding = config.seeding === 'Yes' || tournamentData?.has_seeding_rounds === true;
+
+    const timeSeed1 = formatBracketTime(config.start, config.duration, 0); 
+    const timeSeed2 = formatBracketTime(config.start, config.duration, 1); 
+    const qfTime1 = formatBracketTime(config.start, config.duration, hasSeeding ? 2 : 0); 
+    const qfTime2 = formatBracketTime(config.start, config.duration, hasSeeding ? 3 : 1);
+    const sfTime = formatBracketTime(config.start, config.duration, hasSeeding ? 4 : 2);
+    const finalTime = formatBracketTime(config.start, config.duration, hasSeeding ? 5 : 3);
+
+    const allBracketMatches = [];
+    ['gold', 'silver', 'bronze'].forEach(div => {
+        if (div === 'bronze' && !config.locBronze) return;
         
-        playedBracketMatches.forEach(m => {
-            let depth = depthMap[m.type] || 0;
-            if (depth > maxDepth) {
-                maxDepth = depth;
-                deepestMatch = m;
+        let r1 = 1, r2 = 2, prefix = 'G';
+        if (div === 'silver') { r1 = 3; r2 = 4; prefix = 'S'; }
+        else if (div === 'bronze') { r1 = 5; r2 = 6; prefix = 'B'; }
+        
+        const pA = pools[0]?.id || 'poolA', pB = pools[1]?.id || 'poolB', pC = pools[2]?.id || 'poolC', pD = pools[3]?.id || 'poolD';
+        
+        if (hasSeeding) {
+            allBracketMatches.push(
+                { time: timeSeed1, id: `${prefix}S1`, t1: `seed:${pA}:${r1}`, t2: `seed:${pB}:${r1}`, ref: `seed:${pD}:${r1}` },
+                { time: timeSeed2, id: `${prefix}S2`, t1: `seed:${pC}:${r1}`, t2: `seed:${pD}:${r1}`, ref: `loser:${prefix}S1` },
+                { time: timeSeed2, id: `${prefix}S3`, t1: `seed:${pA}:${r2}`, t2: `seed:${pB}:${r2}`, ref: `loser:${prefix}S4` },
+                { time: timeSeed1, id: `${prefix}S4`, t1: `seed:${pC}:${r2}`, t2: `seed:${pD}:${r2}`, ref: `seed:${pB}:${r2}` },
+                { time: qfTime1, id: `${prefix}1`, t1: `winner:${prefix}S1`, t2: `loser:${prefix}S4`, ref: `loser:${prefix}S2` },
+                { time: qfTime2, id: `${prefix}2`, t1: `winner:${prefix}S3`, t2: `loser:${prefix}S2`, ref: `loser:${prefix}1` },
+                { time: qfTime2, id: `${prefix}3`, t1: `winner:${prefix}S2`, t2: `loser:${prefix}S3`, ref: `loser:${prefix}4` },
+                { time: qfTime1, id: `${prefix}4`, t1: `winner:${prefix}S4`, t2: `loser:${prefix}S1`, ref: `loser:${prefix}S3` },
+                { time: sfTime, id: `${prefix}5`, t1: `winner:${prefix}1`, t2: `winner:${prefix}2`, ref: `loser:${prefix}2` },
+                { time: sfTime, id: `${prefix}6`, t1: `winner:${prefix}3`, t2: `winner:${prefix}4`, ref: `loser:${prefix}3` },
+                { time: finalTime, id: `${prefix}7`, t1: `winner:${prefix}5`, t2: `winner:${prefix}6`, ref: `loser:${prefix}5` }
+            );
+        } else {
+            allBracketMatches.push(
+                { time: qfTime1, id: `${prefix}1`, t1: `seed:${pA}:${r1}`, t2: `seed:${pB}:${r2}`, ref: `seed:${pC}:${r2}` },
+                { time: qfTime2, id: `${prefix}2`, t1: `seed:${pD}:${r1}`, t2: `seed:${pC}:${r2}`, ref: `loser:${prefix}1` },
+                { time: qfTime2, id: `${prefix}3`, t1: `seed:${pC}:${r1}`, t2: `seed:${pD}:${r2}`, ref: `loser:${prefix}4` },
+                { time: qfTime1, id: `${prefix}4`, t1: `seed:${pB}:${r1}`, t2: `seed:${pA}:${r2}`, ref: `seed:${pD}:${r2}` },
+                { time: sfTime, id: `${prefix}5`, t1: `winner:${prefix}1`, t2: `winner:${prefix}2`, ref: `loser:${prefix}2` },
+                { time: sfTime, id: `${prefix}6`, t1: `winner:${prefix}3`, t2: `winner:${prefix}4`, ref: `loser:${prefix}3` },
+                { time: finalTime, id: `${prefix}7`, t1: `winner:${prefix}5`, t2: `winner:${prefix}6`, ref: `loser:${prefix}5` }
+            );
+        }
+    });
+
+    const isPoolFinished = (poolId) => {
+        const poolTeams = (standingsByPool[poolId] || []).map(t => t.id);
+        if (!poolTeams.length) return false;
+        const poolMatches = matches.filter(m => poolTeams.includes(m.teamA) || poolTeams.includes(m.teamB));
+        return !poolMatches.some(m => m.status !== 'completed' && m.status !== 'complete');
+    };
+
+    const resolveTeamId = (refStr) => {
+        if (!refStr) return null;
+        if (refStr.startsWith('seed:')) {
+            const [, poolId, rank] = refStr.split(':');
+            const rankIdx = parseInt(rank) - 1;
+            if (isPoolFinished(poolId) && standingsByPool[poolId]?.[rankIdx]) {
+                return standingsByPool[poolId][rankIdx].id;
             }
-        });
-
-        if (deepestMatch) {
-            let isComplete = deepestMatch.status === 'Complete' || deepestMatch.status === 'Final';
-            
-            if (!isComplete) {
-                playoffFinishText = `In ${division} ${deepestMatch.type}`;
-            } else {
-                let setsA = 0; let setsB = 0;
-                if (deepestMatch.s1A !== "" && deepestMatch.s1B !== "") { parseInt(deepestMatch.s1A) > parseInt(deepestMatch.s1B) ? setsA++ : setsB++; }
-                if (deepestMatch.s2A !== "" && deepestMatch.s2B !== "") { parseInt(deepestMatch.s2A) > parseInt(deepestMatch.s2B) ? setsA++ : setsB++; }
-                if (setsA < 2 && setsB < 2 && deepestMatch.s3A !== "" && deepestMatch.s3B !== "") { parseInt(deepestMatch.s3A) > parseInt(deepestMatch.s3B) ? setsA++ : setsB++; }
-
-                let wonDeepest = (deepestMatch.teamA === myTeam.name && setsA > setsB) || (deepestMatch.teamB === myTeam.name && setsB > setsA);
-
-                if (deepestMatch.type === 'Finals') {
-                    playoffFinishText = wonDeepest ? `🏆 ${division} Champion` : `🥈 ${division} 2nd Place`;
-                } else if (deepestMatch.type === 'Semifinals') {
-                    playoffFinishText = wonDeepest ? `Adv to ${division} Finals` : `🥉 ${division} Semifinalist (3rd)`;
-                } else if (deepestMatch.type === 'Quarterfinals') {
-                    playoffFinishText = wonDeepest ? `Adv to ${division} Semis` : `🏅 ${division} Quarterfinalist (5th)`;
-                } else {
-                    playoffFinishText = `${division} Bracket`;
+            return null;
+        }
+        if (refStr.startsWith('winner:') || refStr.startsWith('loser:')) {
+            const [, matchId] = refStr.split(':');
+            const rawScore = savedScores[matchId];
+            if (!rawScore) return null;
+            if (rawScore.setsA !== undefined && rawScore.setsB !== undefined && rawScore.setsA !== rawScore.setsB) {
+                const matchDef = allBracketMatches.find(m => m.id === matchId);
+                if (matchDef) {
+                    const t1Id = resolveTeamId(matchDef.t1);
+                    const t2Id = resolveTeamId(matchDef.t2);
+                    if (t1Id && t2Id) {
+                        if (refStr.startsWith('winner:')) return rawScore.setsA > rawScore.setsB ? t1Id : t2Id;
+                        if (refStr.startsWith('loser:')) return rawScore.setsA > rawScore.setsB ? t2Id : t1Id;
+                    }
                 }
             }
         }
+        return null;
+    };
+
+    const resolveTeamName = (refStr, resolvedId) => {
+        if (resolvedId) {
+            const t = teams.find(t => t.id === resolvedId);
+            if (t) return t.name;
+        }
+        if (refStr.startsWith('seed:')) {
+            const [, poolId, rank] = refStr.split(':');
+            const p = pools.find(pl => pl.id === poolId);
+            const rankStr = rank == 1 ? '1st' : rank == 2 ? '2nd' : rank == 3 ? '3rd' : '4th';
+            return `${rankStr} ${p ? p.name : 'Pool'}`;
+        }
+        if (refStr.startsWith('winner:')) return `Winner ${refStr.split(':')[1]}`;
+        if (refStr.startsWith('loser:')) return `Loser ${refStr.split(':')[1]}`;
+        return 'TBD';
+    };
+
+    const myBracketMatches = allBracketMatches.map(m => {
+        const t1Id = resolveTeamId(m.t1);
+        const t2Id = resolveTeamId(m.t2);
+        const refId = resolveTeamId(m.ref);
+        return { 
+            ...m, t1Id, t2Id, refId,
+            teamAName: resolveTeamName(m.t1, t1Id),
+            teamBName: resolveTeamName(m.t2, t2Id),
+            refName: resolveTeamName(m.ref, refId),
+            rawScore: savedScores[m.id] || {}
+        };
+    }).filter(m => m.t1Id === teamId || m.t2Id === teamId || m.refId === teamId);
+
+    let bracketMatchWins = 0, bracketMatchLosses = 0, bracketSetWins = 0, bracketSetLosses = 0;
+    let highestRound = 0;
+    let wonHighest = false;
+    let divName = '';
+    
+    myBracketMatches.forEach(m => {
+        if (m.t1Id === teamId || m.t2Id === teamId) {
+            const rs = m.rawScore;
+            if (rs && rs.setsA !== undefined && rs.setsB !== undefined && rs.setsA !== rs.setsB) {
+                const iAmT1 = m.t1Id === teamId;
+                const mySets = iAmT1 ? rs.setsA : rs.setsB;
+                const oppSets = iAmT1 ? rs.setsB : rs.setsA;
+                
+                bracketSetWins += mySets;
+                bracketSetLosses += oppSets;
+                const wonMatch = mySets > oppSets;
+                if (wonMatch) bracketMatchWins++;
+                else bracketMatchLosses++;
+
+                let round = 0;
+                const matchNum = m.id.replace(/[GSB]/, '');
+                if (matchNum === '7') round = 3; 
+                else if (matchNum === '5' || matchNum === '6') round = 2; 
+                else if (['1','2','3','4'].includes(matchNum)) round = 1; 
+                
+                if (round > highestRound || (round === highestRound && wonMatch)) {
+                    highestRound = round;
+                    wonHighest = wonMatch;
+                    const divPrefix = m.id.charAt(0);
+                    divName = divPrefix === 'G' ? 'Gold' : divPrefix === 'S' ? 'Silver' : 'Bronze';
+                }
+            }
+        }
+    });
+
+    let finishBadgeHtml = '';
+    if (highestRound === 3) {
+        if (wonHighest) finishBadgeHtml = `<div style="display: inline-block; background: var(--accent-orange); color: white; padding: 4px 12px; border-radius: 20px; font-weight: bold; font-size: 0.85rem; margin-top: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">🏆 ${divName} Division Champion</div>`;
+        else finishBadgeHtml = `<div style="display: inline-block; background: #475569; color: white; padding: 4px 12px; border-radius: 20px; font-weight: bold; font-size: 0.85rem; margin-top: 6px;">🥈 ${divName} Division Runner-Up</div>`;
+    } else if (highestRound === 2 && !wonHighest) {
+        finishBadgeHtml = `<div style="display: inline-block; background: #334155; color: #cbd5e1; padding: 4px 12px; border-radius: 20px; font-weight: bold; font-size: 0.8rem; margin-top: 6px;">🏅 ${divName} Semi-Finalist</div>`;
+    } else if (highestRound === 1 && !wonHighest) {
+        finishBadgeHtml = `<div style="display: inline-block; background: #334155; color: #cbd5e1; padding: 4px 12px; border-radius: 20px; font-weight: bold; font-size: 0.8rem; margin-top: 6px;">🏅 ${divName} Quarter-Finalist</div>`;
     }
 
-    // UPDATED HTML: Moved finishes to centered pill badges below the header
-    let html = `
-      <div class="data-card" style="text-align: center; padding: 20px; border-top: 4px solid ${displayColor}; margin-bottom: 25px;">
-         ${logoHTML}
-         <h2 style="margin: 10px 0 5px 0; color: ${displayColor};">${myTeam.name}</h2>
-         <div style="color: var(--text-secondary); font-size: 0.9rem;">🏐 ${myPool.name} | ${myPool.site}</div>
-         
-         <div style="display: flex; justify-content: center; gap: 8px; margin-top: 15px; flex-wrap: wrap;">
-             ${poolFinishText ? `<span style="background: rgba(255,255,255,0.05); border: 1px solid ${displayColor}; color: ${displayColor}; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: bold;">Pool: ${poolFinishText}</span>` : ''}
-             ${playoffFinishText && playoffFinishText !== "TBD" ? `<span style="background: rgba(255,255,255,0.05); border: 1px solid ${displayColor}; color: ${displayColor}; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: bold;">${playoffFinishText}</span>` : ''}
-         </div>
-         
-         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px;">
-            <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
-                <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-weight: bold;">Pool Play</div>
-                <div style="display: flex; justify-content: space-around;">
-                   <div><div style="font-size: 1.3rem; font-weight: bold; color: var(--text-primary);">${myTeam.wins}-${myTeam.losses}</div><div style="font-size: 0.7rem; color: var(--text-secondary);">Match</div></div>
-                   <div><div style="font-size: 1.3rem; font-weight: bold; color: var(--text-primary);">${myTeam.setsWon}-${myTeam.setsLost}</div><div style="font-size: 0.7rem; color: var(--text-secondary);">Set</div></div>
-                </div>
-            </div>
-            <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
-                <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-weight: bold;">Playoffs</div>
-                <div style="display: flex; justify-content: space-around;">
-                   <div><div style="font-size: 1.3rem; font-weight: bold; color: var(--text-primary);">${bracketWins}-${bracketLosses}</div><div style="font-size: 0.7rem; color: var(--text-secondary);">Match</div></div>
-                   <div><div style="font-size: 1.3rem; font-weight: bold; color: var(--text-primary);">${bracketSetsWon}-${bracketSetsLost}</div><div style="font-size: 0.7rem; color: var(--text-secondary);">Set</div></div>
-                </div>
-            </div>
-         </div>
-      </div>
+    // 3. BUILD HEADER
+    const logoHtml = team.logo_id 
+        ? `<img src="${team.logo_id}" style="width: 70px; height: 70px; object-fit: contain;">`
+        : `<div style="width: 70px; height: 70px; border-radius: 8px; background: var(--accent-orange);"></div>`;
+
+    const gridStyles = `
+        <style>
+            .team-match-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; padding-bottom: 15px; }
+            @media (max-width: 1300px) { .team-match-grid { grid-template-columns: repeat(4, 1fr); } }
+            @media (max-width: 1050px) { .team-match-grid { grid-template-columns: repeat(3, 1fr); } }
+            @media (max-width: 768px) { .team-match-grid { grid-template-columns: repeat(2, 1fr); } }
+            @media (max-width: 480px) { .team-match-grid { grid-template-columns: 1fr; } }
+            .team-header-container { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px; background: var(--surface-dark); border: 1px solid var(--border-color); border-left: 6px solid var(--accent-orange); border-radius: 8px; padding: 20px; margin-bottom: 25px; }
+            .team-header-identity { display: flex; align-items: center; gap: 20px; flex: 1 1 300px; }
+            .team-header-stats { display: flex; gap: 25px; flex-wrap: wrap; justify-content: flex-end; flex: 1 1 auto; }
+            @media (max-width: 768px) { 
+                .team-header-container { flex-direction: column; text-align: center; border-left: 1px solid var(--border-color); border-top: 6px solid var(--accent-orange); } 
+                .team-header-identity { flex-direction: column; gap: 10px; width: 100%; } 
+                .team-header-stats { justify-content: center; width: 100%; } 
+                .header-divider { display: none !important; }
+            }
+        </style>
     `;
 
-    const getContrastYIQ = (hexcolor) => {
-        if (!hexcolor || !hexcolor.includes('#')) return '#FFFFFF';
-        let hex = hexcolor.replace('#', '');
-        if (hex.length === 3) hex = hex.split('').map(x => x + x).join('');
-        const r = parseInt(hex.substr(0, 2), 16);
-        const g = parseInt(hex.substr(2, 2), 16);
-        const b = parseInt(hex.substr(4, 2), 16);
-        const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
-        return (yiq >= 135) ? '#0F172A' : '#FFFFFF'; 
-    };
+    let html = `
+        ${gridStyles}
+        <div class="team-header-container">
+            <div class="team-header-identity">
+                ${logoHtml}
+                <div>
+                    <h2 style="margin: 0 0 4px 0; color: var(--accent-orange); font-size: 1.8rem;">${team.name}</h2>
+                    <p style="margin: 0; color: var(--text-secondary); font-size: 0.85rem;">🏐 ${poolName} | ${location}</p>
+                    ${finishBadgeHtml}
+                </div>
+            </div>
+            
+            <div class="team-header-stats">
+                <div style="text-align: center;">
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); font-weight: bold; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px;">Pool Play</div>
+                    <div style="display: flex; gap: 20px; justify-content: center;">
+                        <div>
+                            <div style="font-size: 1.4rem; font-weight: bold; color: white;">${poolMatchWins} - ${poolMatchLosses}</div>
+                            <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase;">Matches</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 1.4rem; font-weight: bold; color: white;">${poolSetWins} - ${poolSetLosses}</div>
+                            <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase;">Sets</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="header-divider" style="width: 1px; background: #334155; display: block;"></div>
+                
+                <div style="text-align: center;">
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); font-weight: bold; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px;">Bracket Play</div>
+                    <div style="display: flex; gap: 20px; justify-content: center;">
+                        <div>
+                            <div style="font-size: 1.4rem; font-weight: bold; color: white;">${bracketMatchWins} - ${bracketMatchLosses}</div>
+                            <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase;">Matches</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 1.4rem; font-weight: bold; color: white;">${bracketSetWins} - ${bracketSetLosses}</div>
+                            <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase;">Sets</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
 
-    const badgeTextColor = getContrastYIQ(displayColor);
+    // Determine the next upcoming match index for pool matches to highlight it automatically
+    const myPoolMatches = matches.filter(m => m.teamA === team.id || m.teamB === team.id || m.ref === team.id);
+    myPoolMatches.sort((a, b) => a.time.localeCompare(b.time));
+    const nextPoolMatchId = myPoolMatches.find(m => m.status !== 'completed' && m.status !== 'complete')?.id;
 
-    const getSetHighlight = (sA, sB) => {
-        let numA = parseInt(sA); let numB = parseInt(sB);
-        if (isNaN(numA) || isNaN(numB)) return { a: 'color: var(--text-secondary);', b: 'color: var(--text-secondary);' };
-        if (numA > numB) return { a: 'background: rgba(255,255,255,0.15); color: #FFF; font-weight: bold; border-radius: 4px; padding: 2px 8px;', b: 'color: var(--text-secondary);' };
-        if (numB > numA) return { a: 'color: var(--text-secondary);', b: 'background: rgba(255,255,255,0.15); color: #FFF; font-weight: bold; border-radius: 4px; padding: 2px 8px;' };
-        return { a: 'color: var(--text-secondary);', b: 'color: var(--text-secondary);' };
-    };
-
-    const renderMatchCard = (match) => {
-        let isReffing = match.ref === myTeam.name;
-        let isComplete = match.status === 'Complete' || match.status === 'Final';
-        let opacity = isComplete ? '1' : '0.8';
+    // 4. MATCH CARD TEMPLATE
+    const buildMatchCard = (m, isBracket = false, matchLabel = '') => {
+        const refProperty = isBracket ? m.refId : m.ref; 
+        const isRefOnly = refProperty === team.id && (isBracket ? (m.t1Id !== team.id && m.t2Id !== team.id) : (m.teamA !== team.id && m.teamB !== team.id));
         
-        let borderHighlight = isComplete ? `border-left: 4px solid ${displayColor};` : 'border-left: 4px solid var(--border-color);';
+        const tAId = isBracket ? m.t1Id : m.teamA;
+        const tBId = isBracket ? m.t2Id : m.teamB;
         
-        let refBadge = isReffing ? `<span style="font-size: 0.65rem; background: ${displayColor}; color: ${badgeTextColor}; padding: 2px 6px; border-radius: 4px; font-weight: bold;">REF DUTY</span>` : '';
-        let refText = isReffing ? `<span style="color: ${displayColor}; font-weight: bold;">Ref: ${match.ref}</span>` : 'Ref: ' + (match.ref || '-');
-
-        let setsA = 0; let setsB = 0;
-        if (match.s1A !== "" && match.s1B !== "") { parseInt(match.s1A) > parseInt(match.s1B) ? setsA++ : setsB++; }
-        if (match.s2A !== "" && match.s2B !== "") { parseInt(match.s2A) > parseInt(match.s2B) ? setsA++ : setsB++; }
-        if (setsA < 2 && setsB < 2 && match.s3A !== "" && match.s3B !== "") { parseInt(match.s3A) > parseInt(match.s3B) ? setsA++ : setsB++; }
-
-        let teamAWon = isComplete && setsA > setsB;
-        let teamBWon = isComplete && setsB > setsA;
-
-        let badgeStyle = `display: inline-flex; align-items: center; justify-content: center; background: ${displayColor}; color: ${badgeTextColor}; width: 16px; height: 16px; border-radius: 50%; margin-left: 6px; font-size: 0.65rem; font-weight: bold; flex-shrink: 0;`;
-        let badgeA = teamAWon ? `<span style="${badgeStyle}" title="Winner">✓</span>` : '';
-        let badgeB = teamBWon ? `<span style="${badgeStyle}" title="Winner">✓</span>` : '';
+        const teamAName = isBracket ? m.teamAName : (teams.find(t => t.id === m.teamA)?.name || 'TBD');
+        const teamBName = isBracket ? m.teamBName : (teams.find(t => t.id === m.teamB)?.name || 'TBD');
+        const refName = isBracket ? m.refName : (teams.find(t => t.id === m.ref)?.name || 'TBD');
         
-        let nameStyleA = teamAWon ? 'font-weight: bold; color: var(--text-primary);' : (isComplete ? 'color: var(--text-secondary);' : 'font-weight: 600; color: var(--text-primary);');
-        let nameStyleB = teamBWon ? 'font-weight: bold; color: var(--text-primary);' : (isComplete ? 'color: var(--text-secondary);' : 'font-weight: 600; color: var(--text-primary);');
+        let s1A = isBracket ? m.rawScore?.s1A : m.s1A;
+        let s1B = isBracket ? m.rawScore?.s1B : m.s1B;
+        let s2A = isBracket ? m.rawScore?.s2A : m.s2A;
+        let s2B = isBracket ? m.rawScore?.s2B : m.s2B;
+        let s3A = isBracket ? m.rawScore?.s3A : m.s3A;
+        let s3B = isBracket ? m.rawScore?.s3B : m.s3B;
 
-        if (match.teamA === myTeam.name && (!isComplete || teamAWon)) nameStyleA = `color: ${displayColor}; font-weight: bold;`;
-        if (match.teamB === myTeam.name && (!isComplete || teamBWon)) nameStyleB = `color: ${displayColor}; font-weight: bold;`;
+        let isComplete = false;
+        let matchWinnerId = null;
+        let matchState = 'pending';
 
-        let h1 = getSetHighlight(match.s1A, match.s1B);
-        let h2 = getSetHighlight(match.s2A, match.s2B);
-        let h3 = getSetHighlight(match.s3A, match.s3B);
+        if (isBracket) {
+            isComplete = m.rawScore?.setsA !== undefined && m.rawScore?.setsB !== undefined && m.rawScore.setsA !== m.rawScore.setsB;
+            if (isComplete) {
+                matchState = 'completed';
+                matchWinnerId = (m.rawScore.setsA > m.rawScore.setsB) ? tAId : tBId;
+            } else if (s1A !== null && s1A !== undefined && s1A !== '') {
+                matchState = 'active';
+            }
+        } else {
+            isComplete = m.status === 'completed' || m.status === 'complete';
+            if (isComplete) {
+                matchState = 'completed';
+                let setsA = 0, setsB = 0;
+                if (parseFloat(s1A) > parseFloat(s1B)) setsA++; else if (parseFloat(s1B) > parseFloat(s1A)) setsB++;
+                if (parseFloat(s2A) > parseFloat(s2B)) setsA++; else if (parseFloat(s2B) > parseFloat(s2A)) setsB++;
+                if (parseFloat(s3A) > parseFloat(s3B)) setsA++; else if (parseFloat(s3B) > parseFloat(s3A)) setsB++;
+                if (setsA > setsB) matchWinnerId = tAId;
+                else if (setsB > setsA) matchWinnerId = tBId;
+            } else if (m.status === 'active' || m.id === nextPoolMatchId) {
+                matchState = 'active';
+            }
+        }
 
-        let matchLabel = match.type && match.type !== 'Pool' ? `<span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: bold;">Match ${match.id}</span>` : '';
+        const displayTime = isBracket ? m.time : formatPoolTime(m.time);
+        
+        let statusBadge = '';
+        if (matchState === 'completed') {
+            statusBadge = `<div style="display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: 1px solid #334155; color: #94a3b8; border-radius: 4px; font-size: 0.7rem;" title="Completed">✔</div>`;
+        } else if (matchState === 'active') {
+            statusBadge = `<div style="display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: 1px solid #22c55e; background: rgba(34, 197, 94, 0.1); color: #22c55e; border-radius: 4px; font-size: 0.65rem; padding-left: 2px;" title="Active">▶</div>`;
+        } else {
+            statusBadge = `<div style="display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: 1px solid var(--accent-orange); color: var(--accent-orange); border-radius: 4px; font-size: 0.8rem;" title="Upcoming">-</div>`;
+        }
+
+        const refBadge = isRefOnly 
+            ? `<span style="background: var(--accent-orange); color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; display: inline-block;">REF DUTY</span>`
+            : `<span style="border: 1px solid #334155; color: var(--text-secondary); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; display: inline-block; white-space: nowrap;">Ref: <span style="color: ${refName === team.name ? 'var(--accent-orange)' : '#cbd5e1'}; font-weight: 500;">${refName}</span></span>`;
+
+        let tAColor = 'white', tBColor = 'white';
+        let tAWeight = 'normal', tBWeight = 'normal';
+
+        if (isComplete) {
+            tAColor = (matchWinnerId === tAId) ? 'var(--accent-orange)' : '#64748b';
+            tBColor = (matchWinnerId === tBId) ? 'var(--accent-orange)' : '#64748b';
+            tAWeight = (matchWinnerId === tAId) ? 'bold' : 'normal';
+            tBWeight = (matchWinnerId === tBId) ? 'bold' : 'normal';
+        } else {
+            tAColor = (tAId === team.id) ? 'var(--accent-orange)' : 'white';
+            tBColor = (tBId === team.id) ? 'var(--accent-orange)' : 'white';
+            tAWeight = (tAId === team.id) ? 'bold' : 'normal';
+            tBWeight = (tBId === team.id) ? 'bold' : 'normal';
+        }
+
+        const renderScoreBox = (score, isWinner) => {
+            if (score === null || score === undefined || score === '' || score === '-') {
+                return `<div style="width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; color: #475569; border: 1px solid transparent; box-sizing: border-box;">-</div>`;
+            }
+            if (isWinner) {
+                return `<div style="width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.05); border: 1px solid var(--accent-orange); border-radius: 4px; font-weight: bold; color: white; box-sizing: border-box;">${score}</div>`;
+            }
+            return `<div style="width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; color: #94a3b8; border: 1px solid transparent; box-sizing: border-box;">${score}</div>`;
+        };
+
+        const s1A_html = renderScoreBox(s1A, s1A !== null && s1A !== '-' && parseFloat(s1A) > parseFloat(s1B));
+        const s1B_html = renderScoreBox(s1B, s1B !== null && s1B !== '-' && parseFloat(s1B) > parseFloat(s1A));
+        const s2A_html = renderScoreBox(s2A, s2A !== null && s2A !== '-' && parseFloat(s2A) > parseFloat(s2B));
+        const s2B_html = renderScoreBox(s2B, s2B !== null && s2B !== '-' && parseFloat(s2B) > parseFloat(s2A));
+        const s3A_html = renderScoreBox(s3A, s3A !== null && s3A !== '-' && parseFloat(s3A) > parseFloat(s3B));
+        const s3B_html = renderScoreBox(s3B, s3B !== null && s3B !== '-' && parseFloat(s3B) > parseFloat(s3A));
+
+        const isActive = matchState === 'active';
+        const cardBg = isActive ? '#24334a' : '#1e293b';
+        const cardBorder = isActive ? '1px solid var(--accent-orange)' : '1px solid #334155';
+        const cardLeftBorder = isActive ? '4px solid var(--accent-orange)' : (!isRefOnly ? '4px solid var(--accent-orange)' : '4px solid #334155');
+        const cardShadow = isActive ? '0 4px 15px rgba(0,0,0,0.5)' : 'none';
 
         return `
-          <div class="data-card" style="padding: 12px; opacity: ${opacity}; ${borderHighlight} margin: 0; background: var(--surface-dark); border-radius: 6px;">
-             <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 8px; display: flex; justify-content: space-between;">
-                 <div style="display: flex; flex-direction: column; gap: 5px;">
-                     <div style="display: flex; gap: 8px; align-items: center;">
-                         <span style="font-size: 0.7rem; background: var(--surface-lighter); padding: 3px 6px; border-radius: 4px; color: var(--text-secondary); width: fit-content;">${match.status || 'Pending'}</span>
-                         ${matchLabel}
-                     </div>
-                     ${refBadge}
-                 </div>
-                 <div style="display: flex; flex-direction: column; gap: 5px; text-align: right;">
-                     <span style="font-size: 0.8rem; color: ${displayColor}; font-weight: bold;">🕒 ${formatTime(match.time)}</span>
-                     <span style="font-size: 0.75rem; color: var(--text-secondary);">${refText}</span>
-                 </div>
-             </div>
-             <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: center;">
-                <tr>
-                   <td style="text-align: left; padding: 8px 0; ${nameStyleA}">
-                       <div style="display: flex; align-items: center;">
-                           <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;" title="${match.teamA}">${match.teamA}</span>
-                           ${badgeA}
-                       </div>
-                   </td>
-                   <td style="width: 16%;"><span style="${h1.a}">${match.s1A || '-'}</span></td>
-                   <td style="width: 16%;"><span style="${h2.a}">${match.s2A || '-'}</span></td>
-                   <td style="width: 16%;"><span style="${h3.a}">${match.s3A || '-'}</span></td>
-                </tr>
-                <tr>
-                   <td style="text-align: left; padding: 8px 0; ${nameStyleB}">
-                       <div style="display: flex; align-items: center;">
-                           <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;" title="${match.teamB}">${match.teamB}</span>
-                           ${badgeB}
-                       </div>
-                   </td>
-                   <td style="width: 16%;"><span style="${h1.b}">${match.s1B || '-'}</span></td>
-                   <td style="width: 16%;"><span style="${h2.b}">${match.s2B || '-'}</span></td>
-                   <td style="width: 16%;"><span style="${h3.b}">${match.s3B || '-'}</span></td>
-                </tr>
-             </table>
-          </div>
+            <div style="background: ${cardBg}; border-radius: 8px; border: ${cardBorder}; border-left: ${cardLeftBorder}; padding: 10px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; box-shadow: ${cardShadow};">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+                        ${statusBadge}
+                        ${matchLabel ? `<span style="color: white; font-size: 0.65rem; font-weight: bold; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; display: inline-block; white-space: nowrap;">${matchLabel}</span>` : ''}
+                        ${refBadge}
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="color: var(--accent-orange); font-size: 0.75rem; font-weight: bold; white-space: nowrap;">🕒 ${displayTime}</div>
+                    </div>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="color: ${tAColor}; font-weight: ${tAWeight}; font-size: 0.85rem; flex-grow: 1; padding-right: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${teamAName}</div>
+                        <div style="display: flex; gap: 4px; font-size: 0.8rem; padding-left: 6px; border-left: 1px solid #334155;">
+                            ${s1A_html} ${s2A_html} ${s3A_html}
+                        </div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="color: ${tBColor}; font-weight: ${tBWeight}; font-size: 0.85rem; flex-grow: 1; padding-right: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${teamBName}</div>
+                        <div style="display: flex; gap: 4px; font-size: 0.8rem; padding-left: 6px; border-left: 1px solid #334155;">
+                            ${s1B_html} ${s2B_html} ${s3B_html}
+                        </div>
+                    </div>
+                </div>
+            </div>
         `;
     };
 
-    let myMatches = myPool.matches.filter(m => m.teamA === myTeam.name || m.teamB === myTeam.name || m.ref === myTeam.name);
+    // 5. RENDER POOL MATCHES
+    html += `<h3 style="color: white; margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 6px; font-size: 1.1rem;">Pool Schedule & Duties</h3>`;
     
-    html += `<h3 style="font-size: 1.1rem; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 5px; margin-top: 25px;">Pool Schedule & Duties</h3>`;
-    
-    if (myMatches.length === 0) {
+    if (myPoolMatches.length === 0) {
         html += `<p style="color: var(--text-secondary);">No pool matches scheduled yet.</p>`;
     } else {
-        html += `<div class="matches-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin-top: 15px;">`;
-        myMatches.forEach(match => {
-            html += renderMatchCard(match);
+        html += `<div class="team-match-grid">`;
+        myPoolMatches.forEach(m => {
+            html += buildMatchCard(m, false);
         });
         html += `</div>`;
     }
 
-    if (bracketMatches.length > 0) {
-        html += `<h3 style="font-size: 1.1rem; color: var(--text-primary); margin-top: 25px; border-bottom: 1px solid var(--border-color); padding-bottom: 5px;">Bracket Matches</h3>`;
-        html += `<div class="matches-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin-top: 15px;">`;
-        
-        bracketMatches.forEach(match => {
-            html += renderMatchCard(match);
+    // 6. RENDER BRACKET MATCHES
+    html += `<h3 style="color: white; margin-top: 10px; margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 6px; font-size: 1.1rem;">Bracket Matches</h3>`;
+
+    if (myBracketMatches.length === 0) {
+        html += `<div class="team-match-grid"><p style="color: var(--text-secondary); font-size: 0.9rem;">Bracket scheduling depends on pool play results.</p></div>`;
+    } else {
+        html += `<div class="team-match-grid">`;
+        myBracketMatches.forEach(m => {
+            html += buildMatchCard(m, true, `Match ${m.id}`);
         });
         html += `</div>`;
     }
 
-    html += `<div style="text-align: center; color: var(--text-secondary); font-size: 0.75rem; font-style: italic; margin-top: 20px; padding-bottom: 20px;">* Times are estimates. Matches start when courts clear.</div>`;
-    
-    if (content) content.innerHTML = html;
+    content.innerHTML = html;
 }
