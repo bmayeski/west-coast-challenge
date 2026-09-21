@@ -166,6 +166,51 @@ function renderCanvas(canvasId, selectId, isAdmin) {
         return `seed:${poolId}:${rank}`;
     };
 
+    // LOGIC FIX: Check locations to force traveling teams to play in the FIRST time slot.
+    const divSite = selectedDivision === 'gold' ? config.locGold : selectedDivision === 'silver' ? config.locSilver : config.locBronze;
+    const pASite = pools.find(p => p.id === pA)?.site || '';
+    const pCSite = pools.find(p => p.id === pC)?.site || '';
+
+    let q1Time = qfTime1, q4Time = qfTime1;
+    let q2Time = qfTime2, q3Time = qfTime2;
+    let q1Travel = false, q2Travel = false, q3Travel = false, q4Travel = false;
+    
+    // Default Refs
+    let q1Ref = config.refMatch1 ? getRefSeed(config.refMatch1) : `seed:${pC}:${r2}`;
+    let q4Ref = config.refMatch2 ? getRefSeed(config.refMatch2) : `seed:${pD}:${r2}`;
+    let q2Ref = `loser:${prefix}1`, q3Ref = `loser:${prefix}4`;
+
+    let q1Ref_S = `loser:${prefix}S2`, q4Ref_S = `loser:${prefix}S3`;
+    let q2Ref_S = `loser:${prefix}1`, q3Ref_S = `loser:${prefix}4`;
+
+    if (divSite) {
+        const poolATravels = pASite && pASite.toLowerCase() !== divSite.toLowerCase();
+        const poolCTravels = pCSite && pCSite.toLowerCase() !== divSite.toLowerCase();
+
+        if (!poolATravels && poolCTravels) {
+            // C/D travels: They play first, A/B plays second. Swap all times and refs symmetrically.
+            q1Time = qfTime2; q4Time = qfTime2;
+            q2Time = qfTime1; q3Time = qfTime1;
+            q2Travel = divSite; q3Travel = divSite;
+
+            q2Ref = config.refMatch1 ? getRefSeed(config.refMatch1) : `seed:${pA}:${r2}`;
+            q3Ref = config.refMatch2 ? getRefSeed(config.refMatch2) : `seed:${pB}:${r2}`;
+            q1Ref = `loser:${prefix}2`;
+            q4Ref = `loser:${prefix}3`;
+
+            q2Ref_S = `loser:${prefix}S1`;
+            q3Ref_S = `loser:${prefix}S4`;
+            q1Ref_S = `loser:${prefix}2`;
+            q4Ref_S = `loser:${prefix}3`;
+        } else if (poolATravels && !poolCTravels) {
+            // A/B travels: They already play first by default. Just apply badges.
+            q1Travel = divSite; q4Travel = divSite;
+        } else if (poolATravels && poolCTravels) {
+            q1Travel = divSite; q4Travel = divSite;
+            q2Travel = divSite; q3Travel = divSite;
+        }
+    }
+
     const sVal = (id) => savedScores[id]?.setsA !== undefined ? savedScores[id].setsA : null;
     const sValB = (id) => savedScores[id]?.setsB !== undefined ? savedScores[id].setsB : null;
 
@@ -173,19 +218,17 @@ function renderCanvas(canvasId, selectId, isAdmin) {
 
     if (hasSeeding) {
         bracketData = [
-            // Seeding Round (S1 & S4 play first, S2 & S3 play second)
-            // S1 is officiated by the bottom team of S2 (Pool D, Rank 1)
+            // Seeding Round
             { col: 'Seeding Round', time: timeSeed1, id: `${prefix}S1`, t1: `seed:${pA}:${r1}`, t2: `seed:${pB}:${r1}`, ref: `seed:${pD}:${r1}`, s1: sVal(`${prefix}S1`), s2: sValB(`${prefix}S1`) },
             { col: 'Seeding Round', time: timeSeed2, id: `${prefix}S2`, t1: `seed:${pC}:${r1}`, t2: `seed:${pD}:${r1}`, ref: `loser:${prefix}S1`, s1: sVal(`${prefix}S2`), s2: sValB(`${prefix}S2`) },
             { col: 'Seeding Round', time: timeSeed2, id: `${prefix}S3`, t1: `seed:${pA}:${r2}`, t2: `seed:${pB}:${r2}`, ref: `loser:${prefix}S4`, s1: sVal(`${prefix}S3`), s2: sValB(`${prefix}S3`) },
-            // S4 is officiated by the bottom team of S3 (Pool B, Rank 2)
             { col: 'Seeding Round', time: timeSeed1, id: `${prefix}S4`, t1: `seed:${pC}:${r2}`, t2: `seed:${pD}:${r2}`, ref: `seed:${pB}:${r2}`, s1: sVal(`${prefix}S4`), s2: sValB(`${prefix}S4`) },
             
             // Quarterfinals
-            { col: 'Quarterfinals', time: qfTime1, id: `${prefix}1`, t1: `winner:${prefix}S1`, t2: `loser:${prefix}S4`, ref: `loser:${prefix}S2`, s1: sVal(`${prefix}1`), s2: sValB(`${prefix}1`) },
-            { col: 'Quarterfinals', time: qfTime2, id: `${prefix}2`, t1: `winner:${prefix}S3`, t2: `loser:${prefix}S2`, ref: `loser:${prefix}1`, s1: sVal(`${prefix}2`), s2: sValB(`${prefix}2`) },
-            { col: 'Quarterfinals', time: qfTime2, id: `${prefix}3`, t1: `winner:${prefix}S2`, t2: `loser:${prefix}S3`, ref: `loser:${prefix}4`, s1: sVal(`${prefix}3`), s2: sValB(`${prefix}3`) },
-            { col: 'Quarterfinals', time: qfTime1, id: `${prefix}4`, t1: `winner:${prefix}S4`, t2: `loser:${prefix}S1`, ref: `loser:${prefix}S3`, s1: sVal(`${prefix}4`), s2: sValB(`${prefix}4`) },
+            { col: 'Quarterfinals', time: q1Time, id: `${prefix}1`, t1: `winner:${prefix}S1`, t2: `loser:${prefix}S4`, ref: q1Ref_S, travel: q1Travel, s1: sVal(`${prefix}1`), s2: sValB(`${prefix}1`) },
+            { col: 'Quarterfinals', time: q2Time, id: `${prefix}2`, t1: `winner:${prefix}S3`, t2: `loser:${prefix}S2`, ref: q2Ref_S, travel: q2Travel, s1: sVal(`${prefix}2`), s2: sValB(`${prefix}2`) },
+            { col: 'Quarterfinals', time: q3Time, id: `${prefix}3`, t1: `winner:${prefix}S2`, t2: `loser:${prefix}S3`, ref: q3Ref_S, travel: q3Travel, s1: sVal(`${prefix}3`), s2: sValB(`${prefix}3`) },
+            { col: 'Quarterfinals', time: q4Time, id: `${prefix}4`, t1: `winner:${prefix}S4`, t2: `loser:${prefix}S1`, ref: q4Ref_S, travel: q4Travel, s1: sVal(`${prefix}4`), s2: sValB(`${prefix}4`) },
             
             // Semifinals
             { col: 'Semifinals', time: sfTime, id: `${prefix}5`, t1: `winner:${prefix}1`, t2: `winner:${prefix}2`, ref: `loser:${prefix}2`, s1: sVal(`${prefix}5`), s2: sValB(`${prefix}5`) },
@@ -196,13 +239,11 @@ function renderCanvas(canvasId, selectId, isAdmin) {
         ];
     } else {
         bracketData = [
-            // Standard Quarterfinals (1v8, 4v5, 3v6, 2v7 equivalent from pool rankings)
-            // Q1 is officiated by the bottom team of Q2 (Pool C, Rank 2)
-            { col: 'Quarterfinals', time: qfTime1, id: `${prefix}1`, t1: `seed:${pA}:${r1}`, t2: `seed:${pB}:${r2}`, ref: `seed:${pC}:${r2}`, s1: sVal(`${prefix}1`), s2: sValB(`${prefix}1`) },
-            { col: 'Quarterfinals', time: qfTime2, id: `${prefix}2`, t1: `seed:${pD}:${r1}`, t2: `seed:${pC}:${r2}`, ref: `loser:${prefix}1`, s1: sVal(`${prefix}2`), s2: sValB(`${prefix}2`) },
-            { col: 'Quarterfinals', time: qfTime2, id: `${prefix}3`, t1: `seed:${pC}:${r1}`, t2: `seed:${pD}:${r2}`, ref: `loser:${prefix}4`, s1: sVal(`${prefix}3`), s2: sValB(`${prefix}3`) },
-            // Q4 is officiated by the bottom team of Q3 (Pool D, Rank 2)
-            { col: 'Quarterfinals', time: qfTime1, id: `${prefix}4`, t1: `seed:${pB}:${r1}`, t2: `seed:${pA}:${r2}`, ref: `seed:${pD}:${r2}`, s1: sVal(`${prefix}4`), s2: sValB(`${prefix}4`) },
+            // Quarterfinals
+            { col: 'Quarterfinals', time: q1Time, id: `${prefix}1`, t1: `seed:${pA}:${r1}`, t2: `seed:${pB}:${r2}`, ref: q1Ref, travel: q1Travel, s1: sVal(`${prefix}1`), s2: sValB(`${prefix}1`) },
+            { col: 'Quarterfinals', time: q2Time, id: `${prefix}2`, t1: `seed:${pD}:${r1}`, t2: `seed:${pC}:${r2}`, ref: q2Ref, travel: q2Travel, s1: sVal(`${prefix}2`), s2: sValB(`${prefix}2`) },
+            { col: 'Quarterfinals', time: q3Time, id: `${prefix}3`, t1: `seed:${pC}:${r1}`, t2: `seed:${pD}:${r2}`, ref: q3Ref, travel: q3Travel, s1: sVal(`${prefix}3`), s2: sValB(`${prefix}3`) },
+            { col: 'Quarterfinals', time: q4Time, id: `${prefix}4`, t1: `seed:${pB}:${r1}`, t2: `seed:${pA}:${r2}`, ref: q4Ref, travel: q4Travel, s1: sVal(`${prefix}4`), s2: sValB(`${prefix}4`) },
             
             // Semifinals
             { col: 'Semifinals', time: sfTime, id: `${prefix}5`, t1: `winner:${prefix}1`, t2: `winner:${prefix}2`, ref: `loser:${prefix}2`, s1: sVal(`${prefix}5`), s2: sValB(`${prefix}5`) },
@@ -259,7 +300,7 @@ function renderCanvas(canvasId, selectId, isAdmin) {
             .bracket-column { display: flex; flex-direction: column; } 
             .bracket-matches { display: flex; flex-direction: column; flex-grow: 1; justify-content: space-around; gap: 8px; }
             .bracket-col-title { color: var(--accent-orange); font-weight: bold; font-size: 0.8rem; text-align: center; margin-bottom: 5px; text-transform: uppercase; }
-            .bracket-card { width: 220px; background: #1e293b; border-radius: 6px; border: 1px solid #334155; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+            .bracket-card { width: 220px; background: #1e293b; border-radius: 6px; border: 1px solid #334155; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.2); display: flex; flex-direction: column; }
             .bracket-header { display: flex; justify-content: space-between; align-items: center; padding: 3px 8px; background: #0f172a; border-bottom: 1px solid #334155; }
             .bracket-time { color: var(--accent-orange); font-size: 0.7rem; font-weight: bold; pointer-events: none; }
             .bracket-id { color: #64748b; font-size: 0.65rem; font-weight: bold; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; pointer-events: none; }
@@ -294,12 +335,15 @@ function renderCanvas(canvasId, selectId, isAdmin) {
 
         const adminEditButton = isAdmin ? `
             <button class="btn edit-bracket-match-btn" data-match-id="${match.id}" data-t1="${team1.name}" data-t2="${team2.name}" 
-            style="width: 100%; padding: 4px; font-size: 0.75rem; background: rgba(255,255,255,0.05); color: white; border: 1px solid #334155; cursor: pointer; border-radius: 0;">
+            style="width: 100%; padding: 4px; font-size: 0.75rem; background: rgba(255,255,255,0.05); color: white; border: none; border-top: 1px solid #334155; cursor: pointer; border-radius: 0; margin-top: auto;">
             ✏️ Edit Match
             </button>
         ` : '';
 
-        // Extract raw set scores from the database object
+        const travelBadge = match.travel 
+            ? `<div style="background: rgba(242, 105, 34, 0.15); color: var(--accent-orange); font-size: 0.65rem; text-align: center; padding: 4px; border-top: 1px solid #334155; font-weight: bold; letter-spacing: 0.5px; margin-top: auto;">🚗 WINNER TRAVELS TO ${match.travel.toUpperCase()}</div>`
+            : '';
+
         const raw = savedScores[match.id] || {};
         let scoresText = [];
         if (raw.s1A != null && raw.s1B != null) scoresText.push(`${raw.s1A}-${raw.s1B}`);
@@ -331,6 +375,7 @@ function renderCanvas(canvasId, selectId, isAdmin) {
                 <div>Ref: <span class="bracket-ref-team">${refTeam.name}</span></div>
                 <div style="color: #94a3b8; font-weight: 500; letter-spacing: 0.5px;">${scoresDisplay}</div>
             </div>
+            ${travelBadge}
             ${adminEditButton}
         </div>
         `;
