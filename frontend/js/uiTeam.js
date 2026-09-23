@@ -271,10 +271,12 @@ export function renderMyTeam(teamId) {
             .team-header-container { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px; background: var(--surface-dark); border: 1px solid var(--border-color); border-left: 6px solid var(--accent-orange); border-radius: 8px; padding: 20px; margin-bottom: 25px; }
             .team-header-identity { display: flex; align-items: center; gap: 20px; flex: 1 1 300px; }
             .team-header-stats { display: flex; gap: 25px; flex-wrap: wrap; justify-content: flex-end; flex: 1 1 auto; }
+            
             @media (max-width: 768px) { 
-                .team-header-container { flex-direction: column; text-align: center; border-left: 1px solid var(--border-color); border-top: 6px solid var(--accent-orange); } 
-                .team-header-identity { flex-direction: column; gap: 10px; width: 100%; } 
-                .team-header-stats { justify-content: center; width: 100%; } 
+                .team-header-container { flex-direction: column; text-align: center; border-left: 1px solid var(--border-color); border-top: 6px solid var(--accent-orange); gap: 25px; } 
+                /* Reset flex-basis to auto so it doesn't force a 300px height */
+                .team-header-identity { flex-direction: column; gap: 10px; width: 100%; flex: 0 1 auto; } 
+                .team-header-stats { justify-content: center; width: 100%; flex: 0 1 auto; } 
                 .header-divider { display: none !important; }
             }
         </style>
