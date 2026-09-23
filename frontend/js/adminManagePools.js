@@ -345,9 +345,6 @@ export function printPoolSheets() {
     const allTeams = getTeams();
     const allMatches = getMatches(); 
     
-    // Attempt to grab live standings if the function is available
-    const standingsByPool = typeof getAllPoolStandings === 'function' ? getAllPoolStandings() : {};
-    
     if (!pools || pools.length === 0) {
         alert("No pools have been created yet.");
         return;
@@ -378,6 +375,20 @@ export function printPoolSheets() {
         h = h % 12 || 12;
         m = m < 10 ? '0' + m : m;
         return `${h}:${m} ${ampm}`;
+    };
+
+    const toRoman = (num) => {
+        if (!num || num === 0) return '';
+        const roman = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+        return roman[num] || num;
+    };
+    
+    const getOrdinal = (n) => {
+        if (n === 1) return '1st';
+        if (n === 2) return '2nd';
+        if (n === 3) return '3rd';
+        if (n === 4) return '4th';
+        return n + 'th';
     };
     
     let advancementText = "1st and 2nd advance to Gold Division &nbsp;&nbsp;|&nbsp;&nbsp; 3rd and 4th advance to Silver Division";
@@ -416,19 +427,31 @@ export function printPoolSheets() {
             
             table.standings-table th { text-transform: uppercase; font-weight: bold; background-color: transparent; color: #334155; }
             table.standings-table td.team-name { text-align: left; font-weight: bold; width: 40%; font-size: 18px; color: #0f172a; }
+            table.standings-table td.team-rank { font-weight: 900; color: #475569; width: 30px; font-size: 18px; }
+            
+            /* Podium Colors and Uniform Width for Placement Badges */
+            .placement-badge { display: inline-block; width: 36px; text-align: center; padding: 2px 0; border-radius: 4px; font-size: 13px; font-weight: 900; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .badge-1st { background-color: #fbbf24 !important; color: #000 !important; }
+            .badge-2nd { background-color: #cbd5e1 !important; color: #000 !important; }
+            .badge-3rd { background-color: #cd7f32 !important; color: #fff !important; }
+            .badge-4th { background-color: #475569 !important; color: #fff !important; }
+            .badge-other { background-color: #0f172a !important; color: #fff !important; }
             
             .pool-info-cell { vertical-align: middle; border-top-left-radius: 8px; }
             .location-name { font-size: 13px; font-weight: bold; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; color: #475569; }
             .pool-badge { display: inline-block; padding: 4px 16px; color: #fff !important; font-size: 18px; font-weight: bold; border-radius: 6px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             
-            .matches-wrapper { width: 75%; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
-            .match-row { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 6px 15px; border: 2px solid #cbd5e1; border-radius: 8px; mt-2; }
+            .matches-wrapper { width: 75%; margin: 0 auto 20px auto; display: flex; flex-direction: column; gap: 12px; }
+            .match-row { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 6px 15px; border: 2px solid #cbd5e1; border-radius: 8px; }
             
             .time-badge { position: absolute; top: -9px; left: 15px; background: #fff; color: #64748b; font-size: 10px; font-weight: 800; padding: 0 6px; letter-spacing: 0.5px; }
             
-            .match-info { font-weight: bold; font-size: 16px; display: flex; align-items: center; gap: 12px; width: 280px; flex-shrink: 0; color: #0f172a; }
-            .match-num { width: 75px; display: inline-block; color: #475569; }
+            .match-info { font-weight: bold; font-size: 16px; display: flex; align-items: center; gap: 8px; width: 280px; flex-shrink: 0; color: #0f172a; }
+            .match-num { width: 70px; display: inline-block; color: #475569; }
             .ref-info { font-weight: normal; font-size: 14px; font-style: italic; color: #64748b; margin-left: auto; }
+            
+            .seed-badge { display: inline-block; width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 4px; font-weight: 900; color: #475569; }
+            .winner-seed { background-color: #cbd5e1 !important; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             
             .game-boxes { display: flex; gap: 20px; flex-grow: 1; justify-content: flex-end; }
             .game-box-group { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: bold; color: #475569; }
@@ -446,7 +469,60 @@ export function printPoolSheets() {
         const poolTeams = allTeams.filter(t => t.pool_id === pool.id).sort((a, b) => a.seed - b.seed);
         const siteColor = getSiteColor(pool.site);
         const poolMatches = allMatches.filter(m => m.pool_id === pool.id).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
-        const pStandings = standingsByPool[pool.id] || [];
+        
+        // Calculate Pool Stats Inline
+        const teamStats = {};
+        poolTeams.forEach(t => teamStats[t.id] = { mw: 0, ml: 0, sw: 0, sl: 0, id: t.id, name: t.name, seed: t.seed });
+        
+        let matchesPlayed = 0;
+        
+        poolMatches.forEach(ms => {
+            const s1A = parseInt(ms.s1A, 10) || 0;
+            const s1B = parseInt(ms.s1B, 10) || 0;
+            const s2A = parseInt(ms.s2A, 10) || 0;
+            const s2B = parseInt(ms.s2B, 10) || 0;
+            const s3A = parseInt(ms.s3A, 10) || 0;
+            const s3B = parseInt(ms.s3B, 10) || 0;
+
+            let aSets = 0, bSets = 0;
+            if (s1A > s1B) aSets++; else if (s1B > s1A) bSets++;
+            if (s2A > s2B) aSets++; else if (s2B > s2A) bSets++;
+            if (s3A > s3B) aSets++; else if (s3B > s3A) bSets++;
+
+            if (aSets > 0 || bSets > 0) {
+                matchesPlayed++;
+                if (teamStats[ms.teamA]) {
+                    teamStats[ms.teamA].sw += aSets;
+                    teamStats[ms.teamA].sl += bSets;
+                    if (aSets > bSets) teamStats[ms.teamA].mw++;
+                    else teamStats[ms.teamA].ml++;
+                }
+                if (teamStats[ms.teamB]) {
+                    teamStats[ms.teamB].sw += bSets;
+                    teamStats[ms.teamB].sl += aSets;
+                    if (bSets > aSets) teamStats[ms.teamB].mw++;
+                    else teamStats[ms.teamB].ml++;
+                }
+            }
+        });
+        
+        const isFinished = poolMatches.length > 0 && matchesPlayed === poolMatches.length;
+        
+        // Convert to array and sort to determine placement rankings
+        let sortedStandings = Object.values(teamStats).sort((a, b) => {
+            if (b.mw !== a.mw) return b.mw - a.mw;
+            if (b.sw !== a.sw) return b.sw - a.sw;
+            if (a.sl !== b.sl) return a.sl - b.sl; 
+            return a.seed - b.seed;
+        });
+        
+        // Attach placement rank to the teamStats object
+        sortedStandings.forEach((s, i) => {
+            teamStats[s.id].rank = i + 1;
+        });
+        
+        // ALWAYS display teams ordered by their original seed
+        const displayTeams = poolTeams.map(t => teamStats[t.id]);
         
         html += `
         <div class="page">
@@ -457,7 +533,7 @@ export function printPoolSheets() {
             <table class="standings-table">
                 <thead>
                     <tr>
-                        <th rowspan="2" class="pool-info-cell">
+                        <th colspan="2" class="pool-info-cell" style="border-right: 1px solid #94a3b8;">
                             <div class="location-name">${pool.site || 'Site TBD'}</div>
                             <div class="pool-badge" style="background-color: ${siteColor};">${pool.name}</div>
                         </th>
@@ -465,6 +541,8 @@ export function printPoolSheets() {
                         <th colspan="2">Games</th>
                     </tr>
                     <tr>
+                        <th style="border-top: 1px solid #94a3b8; width: 30px;">#</th>
+                        <th style="border-top: 1px solid #94a3b8;">Team</th>
                         <th>W</th>
                         <th>L</th>
                         <th>W</th>
@@ -472,15 +550,30 @@ export function printPoolSheets() {
                     </tr>
                 </thead>
                 <tbody>
-                    ${poolTeams.map((t) => {
-                        const stats = pStandings.find(s => s.id === t.id) || { matchWins: '', matchLosses: '', setWins: '', setLosses: '' };
+                    ${displayTeams.map((stats) => {
+                        let placementBadge = '';
+                        if (isFinished) {
+                            let badgeClass = 'badge-other';
+                            if (stats.rank === 1) badgeClass = 'badge-1st';
+                            else if (stats.rank === 2) badgeClass = 'badge-2nd';
+                            else if (stats.rank === 3) badgeClass = 'badge-3rd';
+                            else if (stats.rank === 4) badgeClass = 'badge-4th';
+                            
+                            placementBadge = `<span class="placement-badge ${badgeClass}">${getOrdinal(stats.rank)}</span>`;
+                        }
+                        
                         return `
                         <tr>
-                            <td class="team-name">${t.name}</td>
-                            <td>${stats.matchWins !== undefined ? stats.matchWins : ''}</td>
-                            <td>${stats.matchLosses !== undefined ? stats.matchLosses : ''}</td>
-                            <td>${stats.setWins !== undefined ? stats.setWins : ''}</td>
-                            <td>${stats.setLosses !== undefined ? stats.setLosses : ''}</td>
+                            <td class="team-rank">${stats.seed}</td>
+                            <td class="team-name">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span>${stats.name}</span>${placementBadge}
+                                </div>
+                            </td>
+                            <td>${toRoman(stats.mw)}</td>
+                            <td>${toRoman(stats.ml)}</td>
+                            <td>${toRoman(stats.sw)}</td>
+                            <td>${toRoman(stats.sl)}</td>
                         </tr>
                         `;
                     }).join('')}
@@ -500,6 +593,25 @@ export function printPoolSheets() {
                     const seedB = tB ? tB.seed : '?';
                     const refSeed = refTeam ? refTeam.seed : '?';
                     
+                    const s1A = parseInt(ms.s1A, 10) || 0;
+                    const s1B = parseInt(ms.s1B, 10) || 0;
+                    const s2A = parseInt(ms.s2A, 10) || 0;
+                    const s2B = parseInt(ms.s2B, 10) || 0;
+                    const s3A = parseInt(ms.s3A, 10) || 0;
+                    const s3B = parseInt(ms.s3B, 10) || 0;
+
+                    let aSets = 0; let bSets = 0;
+                    if (s1A > s1B) aSets++; else if (s1B > s1A) bSets++;
+                    if (s2A > s2B) aSets++; else if (s2B > s2A) bSets++;
+                    if (s3A > s3B) aSets++; else if (s3B > s3A) bSets++;
+                    
+                    let winnerId = null;
+                    if (aSets > bSets && aSets > 0) winnerId = ms.teamA;
+                    if (bSets > aSets && bSets > 0) winnerId = ms.teamB;
+                    
+                    const displaySeedA = `<span class="seed-badge ${winnerId === ms.teamA ? 'winner-seed' : ''}">${seedA}</span>`;
+                    const displaySeedB = `<span class="seed-badge ${winnerId === ms.teamB ? 'winner-seed' : ''}">${seedB}</span>`;
+                    
                     const fallbackTime = addMins(poolStart, poolDur * index);
                     const displayTime = formatDisplayTime(ms.time || fallbackTime);
                     
@@ -508,7 +620,7 @@ export function printPoolSheets() {
                         <div class="time-badge">${displayTime}</div>
                         <div class="match-info">
                             <span class="match-num">Match ${index + 1}</span> 
-                            <span>${seedA} &nbsp;&nbsp;&nbsp;&nbsp;v&nbsp;&nbsp;&nbsp;&nbsp; ${seedB}</span> 
+                            <span>${displaySeedA} &nbsp;&nbsp;v&nbsp;&nbsp; ${displaySeedB}</span> 
                             <span class="ref-info">(${refSeed} ref)</span>
                         </div>
                         <div class="game-boxes">

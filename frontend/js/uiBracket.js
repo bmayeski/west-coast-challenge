@@ -91,6 +91,10 @@ export function populateBracketAdminConfig() {
     const divInput = document.getElementById('bracketDivisions');
     if (divInput) divInput.value = existingConfig.divisions || '2';
 
+    // NEW: Load the saved Bracket Sets configuration (defaults to 1)
+    const bracketSetsInput = document.getElementById('bracketSetsConfig');
+    if (bracketSetsInput) bracketSetsInput.value = existingConfig.bracketSets || '1';
+
     const site1Name = document.getElementById('site1Name');
     if (site1Name) site1Name.value = existingConfig.site1Name || '';
     const site1Color = document.getElementById('site1Color');
@@ -584,9 +588,10 @@ export function initBracketAdmin() {
             const site2Color = document.getElementById('site2Color').value;
             const site3Name = document.getElementById('site3Name').value.trim();
             const site3Color = document.getElementById('site3Color').value;
+            const bracketSets = document.getElementById('bracketSetsConfig')?.value || '1';
 
             const configObj = { 
-                start, poolDuration, bracketDuration, format, seeding, divisions,
+                start, poolDuration, bracketDuration, format, seeding, divisions, bracketSets,
                 site1Name, site1Color, site2Name, site2Color, site3Name, site3Color 
             };
             
@@ -890,6 +895,8 @@ export function printBrackets() {
     const tournamentData = getTournamentData();
     const pools = getPools();
     const allTeams = typeof getTeams === 'function' ? getTeams() : [];
+    const allMatches = typeof getMatches === 'function' ? getMatches() : [];
+    const standingsByPool = typeof getAllPoolStandings === 'function' ? getAllPoolStandings() : {};
     
     let config = tournamentData?.bracket_config || {};
     if (typeof config === 'string') {
@@ -952,35 +959,38 @@ export function printBrackets() {
             .header h1 { margin: 0; font-size: 26px; font-weight: 900; text-transform: uppercase; color: #000; }
             .division-badge { padding: 4px 16px; font-size: 20px; font-weight: bold; border-radius: 6px; border: 2px solid #000; color: #000; text-transform: uppercase; letter-spacing: 1px; }
             
-            .bracket-grid { display: flex; flex-grow: 1; gap: 40px; padding-bottom: 5px; height: 100%; }
-            .col { display: flex; flex-direction: column; flex: 1; position: relative; justify-content: space-around; }
+            .bracket-grid { display: flex; flex-grow: 1; gap: 15px; padding-bottom: 5px; height: 100%; justify-content: space-between; }
+            .col { display: flex; flex-direction: column; flex: 1; min-width: 210px; position: relative; justify-content: space-around; }
             .round-title { text-align: center; font-size: 13px; font-weight: bold; text-transform: uppercase; color: #64748b; margin: 0 0 10px 0; letter-spacing: 1px; }
             
             .pair { flex: 1; display: flex; flex-direction: column; justify-content: space-around; position: relative; }
             
-            .match-box { background: #fff; padding: 10px 12px 8px 12px; border: 2px solid #cbd5e1; border-radius: 8px; position: relative; z-index: 2; margin: 5px 0; mt-2; }
+            .match-box { background: #fff; padding: 12px 8px 6px 8px; border: 2px solid #cbd5e1; border-radius: 8px; position: relative; z-index: 2; margin: 5px 0; }
             
             .time-badge { position: absolute; top: -9px; left: 12px; background: #fff; color: #64748b; font-size: 10px; font-weight: 800; padding: 0 6px; letter-spacing: 0.5px; }
+            .ref-badge { position: absolute; top: -9px; right: 12px; background: #fff; color: #64748b; font-size: 10px; font-weight: 800; padding: 0 6px; letter-spacing: 0.5px; }
             
-            .match-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+            .match-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
             
-            .match-id-container { display: flex; flex-direction: row; align-items: baseline; gap: 4px; flex-wrap: wrap; max-width: 70%; }
-            .match-id { font-weight: bold; font-size: 14px; color: #0f172a; white-space: nowrap; }
-            .match-ref { font-size: 11px; font-style: italic; color: #64748b; font-weight: normal; }
+            .match-id-container { display: flex; flex-direction: row; align-items: baseline; gap: 4px; flex-wrap: wrap; }
+            .match-id { font-weight: bold; font-size: 12px; color: #0f172a; white-space: nowrap; }
             
-            .match-loc { font-size: 11px; font-weight: bold; text-transform: uppercase; }
+            .match-loc { font-size: 10px; font-weight: bold; text-transform: uppercase; }
             
             .team-slot { margin-bottom: 6px; }
             .team-slot:last-of-type { margin-bottom: 0px; }
             
-            .team-line-container { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 2px; }
-            .write-line { border-bottom: 2px solid #0f172a; height: 14px; flex-grow: 1; font-size: 14px; font-weight: bold; color: #000; padding-left: 2px; }
-            .score-box { width: 30px; height: 26px; border: 2px solid #94a3b8; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; color: #0f172a; }
+            .team-line-container { display: flex; align-items: flex-end; gap: 6px; margin-bottom: 2px; }
             
-            .team-hint { font-size: 11px; color: #64748b; font-weight: bold; }
+            .write-line { border-bottom: 2px solid #0f172a; height: 16px; flex-grow: 1; font-size: 14px; font-weight: bold; color: #000; padding: 2px 4px 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: flex-end; box-sizing: border-box; }
+            .winner-highlight { background-color: #cbd5e1 !important; border-top-left-radius: 4px; border-top-right-radius: 4px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             
-            .connector { position: absolute; right: -20px; top: 25%; bottom: 25%; width: 20px; border: 2px solid #94a3b8; border-left: none; border-radius: 0 8px 8px 0; z-index: 1; }
-            .stem { position: absolute; right: -40px; top: 50%; width: 20px; border-top: 2px solid #94a3b8; z-index: 1; }
+            .score-box { width: 26px; height: 24px; border: 2px solid #94a3b8; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; color: #0f172a; }
+            
+            .team-hint { font-size: 10px; color: #64748b; font-weight: bold; }
+            
+            .connector { position: absolute; right: -7px; top: 25%; bottom: 25%; width: 7px; border: 2px solid #94a3b8; border-left: none; border-radius: 0 8px 8px 0; z-index: 1; }
+            .stem { position: absolute; right: -15px; top: 50%; width: 8px; border-top: 2px solid #94a3b8; z-index: 1; }
 
             .footer { text-align: center; font-size: 13px; font-style: italic; color: #64748b; margin-top: 5px; font-weight: 600; }
         </style>
@@ -1032,7 +1042,7 @@ export function printBrackets() {
             const raw = savedScores[m.id] || {};
             return {
                 ...m,
-                raw: raw, // Passing raw data to extract scores later
+                raw: raw,
                 site: raw.siteOverride || null,
                 court: raw.courtOverride || null,
                 refOverride: raw.refOverride || null,
@@ -1040,35 +1050,76 @@ export function printBrackets() {
             };
         });
 
-        const formatTeam = (ref, matchSite) => {
-            if (!ref) return { text: '', travel: '', name: '' };
+        // Dynamic Recursive Team Resolver
+        const resolveTeam = (teamRef, matchSite) => {
+            if (!teamRef) return { name: '', hint: '', travel: '', resolved: false };
             
-            // Check if actual team name exists in database
-            const foundTeam = allTeams.find(t => t.id === ref);
-            const actualName = foundTeam ? foundTeam.name : '';
+            const foundTeam = allTeams.find(t => t.id === teamRef);
+            if (foundTeam) return { name: foundTeam.name, hint: '', travel: '', resolved: true };
 
-            if (ref.startsWith('seed:')) {
-                const parts = ref.split(':');
-                const rank = parts[2] == 1 ? '1st' : parts[2] == 2 ? '2nd' : parts[2] == 3 ? '3rd' : '4th';
-                const pName = pools.find(p => p.id === parts[1])?.name || 'Pool';
-                const pSite = pools.find(p => p.id === parts[1])?.site || '';
+            if (typeof teamRef === 'string' && teamRef.startsWith('seed:')) {
+                const parts = teamRef.split(':');
+                const poolId = parts[1];
+                const rankIndex = parseInt(parts[2]) - 1;
+                const poolName = pools.find(p => p.id === poolId)?.name || 'Pool';
+                const pSite = pools.find(p => p.id === poolId)?.site || '';
+                const rankStr = parts[2] == 1 ? '1st' : parts[2] == 2 ? '2nd' : parts[2] == 3 ? '3rd' : '4th';
+                
                 let travel = '';
                 if (pSite && matchSite && pSite !== matchSite) {
-                    travel = `<span style="color: ${getSiteColor(pSite)}; font-weight: bold; margin-left: 4px;">(from ${pSite})</span>`;
+                    travel = `<span style="color: ${getSiteColor(pSite)}; margin-left: 4px;">(from ${pSite})</span>`;
                 }
-                return { text: `${rank} ${pName}`, travel, name: actualName };
-            }
-            if (ref.startsWith('winner:')) {
-                const srcMatch = bracketData.find(m => m.id === ref.split(':')[1]);
-                let travel = '';
-                if (srcMatch && srcMatch.site && matchSite && srcMatch.site !== matchSite) {
-                    travel = `<span style="color: ${getSiteColor(srcMatch.site)}; font-weight: bold; margin-left: 4px;">(from ${srcMatch.site})</span>`;
+
+                const poolStandings = standingsByPool[poolId] || [];
+                
+                const seedLocked = typeof isSeedLocked === 'function' 
+                    ? isSeedLocked(poolId, rankIndex, poolStandings) 
+                    : false; 
+                
+                if (seedLocked && poolStandings[rankIndex]) {
+                    return { name: poolStandings[rankIndex].name, hint: `${rankStr} ${poolName}`, travel, resolved: true };
                 }
-                return { text: `Winner Match ${ref.split(':')[1].replace(/^[GSB]/, '')}`, travel, name: actualName };
+                return { name: '', hint: `${rankStr} ${poolName}`, travel, resolved: false };
             }
-            if (ref.startsWith('loser:')) return { text: `Loser Match ${ref.split(':')[1].replace(/^[GSB]/, '')}`, travel: '', name: actualName };
             
-            return { text: ref, travel: '', name: actualName };
+            if (typeof teamRef === 'string' && (teamRef.startsWith('winner:') || teamRef.startsWith('loser:'))) {
+                const [type, matchId] = teamRef.split(':');
+                const targetPrefix = matchId.charAt(0);
+                const targetNum = matchId.slice(1);
+                const targetDivName = targetPrefix === 'G' ? 'Gold' : targetPrefix === 'S' ? 'Silver' : 'Bronze';
+                const isCrossDivision = targetPrefix !== prefix;
+                
+                const typeStr = type === 'winner' ? 'Winner' : 'Loser';
+                const hint = isCrossDivision 
+                    ? `${typeStr} Match ${targetNum} (${targetDivName})`
+                    : `${typeStr} Match ${targetNum}`;
+                    
+                const targetMatch = bracketData.find(m => m.id === matchId);
+                let travel = '';
+                if (targetMatch && targetMatch.site && matchSite && targetMatch.site !== matchSite) {
+                    travel = `<span style="color: ${getSiteColor(targetMatch.site)}; margin-left: 4px;">(from ${targetMatch.site})</span>`;
+                }
+
+                if (targetMatch && targetMatch.raw) {
+                    let aWins = 0, bWins = 0;
+                    if (targetMatch.raw.s1A > targetMatch.raw.s1B) aWins++; else if (targetMatch.raw.s1B > targetMatch.raw.s1A) bWins++;
+                    if (targetMatch.raw.s2A > targetMatch.raw.s2B) aWins++; else if (targetMatch.raw.s2B > targetMatch.raw.s2A) bWins++;
+                    if (targetMatch.raw.s3A > targetMatch.raw.s3B) aWins++; else if (targetMatch.raw.s3B > targetMatch.raw.s3A) bWins++;
+                    
+                    if (aWins !== bWins && (aWins > 0 || bWins > 0)) {
+                        const t1 = resolveTeam(targetMatch.t1, matchSite);
+                        const t2 = resolveTeam(targetMatch.t2, matchSite);
+                        if (t1.resolved && t2.resolved) {
+                            const advancingTeam = type === 'winner' 
+                                ? (aWins > bWins ? t1 : t2) 
+                                : (aWins > bWins ? t2 : t1);
+                            return { name: advancingTeam.name, hint: hint, travel, resolved: true };
+                        }
+                    }
+                }
+                return { name: '', hint: hint, travel, resolved: false };
+            }
+            return { name: '', hint: teamRef, travel: '', resolved: false };
         };
 
         const formatRef = (ref) => {
@@ -1083,14 +1134,12 @@ export function printBrackets() {
                  const divName = divPrefix === 'G' ? 'Gold' : divPrefix === 'S' ? 'Silver' : 'Bronze';
                  return `Loser M${num} (${divName})`;
              }
-             
              if (ref.startsWith('seed:')) {
                  const parts = ref.split(':');
                  const rank = parts[2] == 1 ? '1st' : parts[2] == 2 ? '2nd' : parts[2] == 3 ? '3rd' : '4th';
                  const pName = pools.find(p => p.id === parts[1])?.name || 'Pool';
                  return `${rank} ${pName}`;
              }
-             
              if (typeof ref === 'string' && ref.toLowerCase().includes('loser')) {
                  if (!ref.includes('(')) {
                      const numMatch = ref.match(/\d+/);
@@ -1099,51 +1148,64 @@ export function printBrackets() {
                      return num ? `Loser M${num} (${div})` : `${cleanedRef} (${div})`;
                  }
              }
-             
              return ref;
         };
         
-        // Helper to generate populated score boxes for a specific team (A or B)
         const generateScoreBoxes = (matchRaw, teamLetter) => {
             let boxes = '';
             for (let i = 1; i <= bracketSets; i++) {
-                const score = matchRaw[`s${i}${teamLetter}`];
-                boxes += `<div class="score-box">${score !== undefined ? score : ''}</div>`;
+                let score = matchRaw[`s${i}${teamLetter}`];
+                // Catch actual null, undefined, or string "null" and print a dash
+                if (score == null || score === 'null' || score === '') {
+                    score = '-';
+                }
+                boxes += `<div class="score-box">${score}</div>`;
             }
             return boxes;
         };
 
         const renderMatchBox = (m) => {
             if (!m) return '';
-            const t1 = formatTeam(m.t1, m.site);
-            const t2 = formatTeam(m.t2, m.site);
+            const t1 = resolveTeam(m.t1, m.site);
+            const t2 = resolveTeam(m.t2, m.site);
             const refStr = formatRef(m.refOverride || m.ref);
+            
+            // Determine Winner for Highlighting
+            let aWins = 0, bWins = 0;
+            if (m.raw) {
+                if (m.raw.s1A > m.raw.s1B) aWins++; else if (m.raw.s1B > m.raw.s1A) bWins++;
+                if (m.raw.s2A > m.raw.s2B) aWins++; else if (m.raw.s2B > m.raw.s2A) bWins++;
+                if (m.raw.s3A > m.raw.s3B) aWins++; else if (m.raw.s3B > m.raw.s3A) bWins++;
+            }
+            const t1Class = (aWins > bWins && aWins > 0) ? 'write-line winner-highlight' : 'write-line';
+            const t2Class = (bWins > aWins && bWins > 0) ? 'write-line winner-highlight' : 'write-line';
             
             return `
             <div class="match-box">
                 <div class="time-badge">${m.time}</div>
+                <div class="ref-badge">Ref: ${refStr}</div>
+                
                 <div class="match-header">
                     <div class="match-id-container">
                         <span class="match-id">Match ${m.id.replace(/^[GSB]/, '')}</span>
-                        <span class="match-ref">(Ref: ${refStr})</span>
                     </div>
                     <span class="match-loc" style="color: ${getSiteColor(m.site)};">${m.site || 'Site TBD'}</span>
                 </div>
                 
                 <div class="team-slot">
                     <div class="team-line-container">
-                        <div class="write-line">${t1.name}</div>
+                        <div class="${t1Class}">${t1.name}</div>
                         ${generateScoreBoxes(m.raw, 'A')}
                     </div>
-                    <div class="team-hint">${t1.text} ${t1.travel}</div>
+                    <div class="team-hint">${t1.hint} ${t1.travel}</div>
                 </div>
                 
                 <div class="team-slot">
                     <div class="team-line-container">
-                        <div class="write-line">${t2.name}</div>
+                        <div class="${t2Class}">${t2.name}</div>
                         ${generateScoreBoxes(m.raw, 'B')}
                     </div>
-                    <div class="team-hint">${t2.text} ${t2.travel}</div>
+                    <div class="team-hint">${t2.hint} ${t2.travel}</div>
                 </div>
             </div>
             `;
