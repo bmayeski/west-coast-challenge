@@ -12,6 +12,7 @@ let sectionCounter = 0;
 export function initEditor() {
     const container = document.getElementById('editor');
     const saveBtn = document.getElementById('saveInfoBtn');
+    const printQrBtn = document.getElementById('printQRFlyerBtn'); // <-- Grab the new button
 
     if (!container) return;
     
@@ -24,6 +25,9 @@ export function initEditor() {
 
     document.getElementById('addInfoSectionBtn')?.addEventListener('click', () => addSection());
     if (saveBtn) saveBtn.addEventListener('click', saveTournamentInfo);
+    
+    // NEW: Attach the click event to print the flyer
+    if (printQrBtn) printQrBtn.addEventListener('click', printQRFlyer); 
 }
 
 export async function loadTournamentInfo() {
@@ -203,4 +207,166 @@ async function saveTournamentInfo() {
         alert("Tournament info saved successfully!");
         loadTournamentInfo(); 
     }
+}
+
+export function printQRFlyer() {
+    // Dynamically grab tournament info to ensure the URL always matches the current event
+    const tournamentData = typeof getTournamentData === 'function' ? getTournamentData() : {};
+    const tournamentId = typeof getTournamentId === 'function' ? getTournamentId() : 'eci-girls-jv-2026';
+    const tournamentName = tournamentData.name || 'Volleyball Tournament';
+    
+    // Use the slug for the URL, falling back to ID if a slug isn't set
+    const tournamentSlug = tournamentData.slug || tournamentId;
+    
+    // Construct the live site URL and safely encode it for the API
+    const siteUrl = `https://sports-ski-matics.vercel.app/?t=${tournamentSlug}`;
+    const encodedUrl = encodeURIComponent(siteUrl);
+    
+    // Generate a high-resolution QR code. Margin=4 enforces the standard "Quiet Zone".
+    const qrCodeUrl = `https://quickchart.io/qr?text=${encodedUrl}&size=400&margin=4`;
+
+    const printWin = window.open('', '_blank');
+    
+    const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Tournament Flyer - ${tournamentName}</title>
+        <style>
+            @page { size: portrait; margin: 0.5in; }
+            body { 
+                font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; 
+                margin: 0; 
+                padding: 0; 
+                background: #fff; 
+                display: flex; 
+                justify-content: center; 
+                align-items: center; 
+                height: 92vh;
+                max-height: 92vh;
+                overflow: hidden;
+                color: #0f172a;
+                box-sizing: border-box;
+            }
+            .flyer-container {
+                width: 100%;
+                height: 100%;
+                border: 4px solid #0f172a;
+                border-radius: 20px;
+                padding: 25px 20px;
+                box-sizing: border-box;
+                text-align: center;
+                display: flex;
+                flex-direction: column;
+            }
+            .header-banner {
+                background: #0f172a;
+                color: #fff;
+                padding: 16px;
+                border-radius: 12px;
+                margin-bottom: 25px;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            h1 { margin: 0; font-size: 28px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
+            h2 { margin: 6px 0 0 0; font-size: 20px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; }
+            
+            .qr-wrapper {
+                margin: 0 auto 20px auto;
+                padding: 15px;
+                background: #fff;
+                border: 6px dashed #cbd5e1;
+                border-radius: 20px;
+                display: inline-block;
+            }
+            .qr-wrapper img { width: 300px; height: 300px; display: block; }
+            
+            .scan-text {
+                font-size: 26px;
+                font-weight: 900;
+                color: #1e293b;
+                margin-bottom: 25px;
+                text-transform: uppercase;
+                letter-spacing: 2px;
+            }
+            
+            .features-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 15px;
+                text-align: left;
+                margin: 0 auto;
+                max-width: 95%;
+            }
+            .feature-card {
+                background: #f8fafc;
+                padding: 12px 16px;
+                border-radius: 12px;
+                border-left: 6px solid #475569;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .feature-title { font-weight: 900; font-size: 16px; margin-bottom: 4px; color: #0f172a; text-transform: uppercase; }
+            .feature-desc { font-size: 12px; color: #475569; margin: 0; font-weight: 600; line-height: 1.3; }
+            
+            .footer-url {
+                margin-top: auto;
+                font-size: 14px;
+                color: #64748b;
+                font-weight: bold;
+                padding-top: 15px;
+                border-top: 2px solid #e2e8f0;
+                word-break: break-all;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="flyer-container">
+            <div class="header-banner">
+                <h1>${tournamentName}</h1>
+                <h2>Live Tournament Hub</h2>
+            </div>
+            
+            <div class="qr-wrapper">
+                <img src="${qrCodeUrl}" alt="Tournament QR Code" />
+            </div>
+            
+            <div class="scan-text">Scan for Live Results</div>
+            
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-title">📊 Pool Standings</div>
+                    <p class="feature-desc">Track live win/loss records and watch the standings automatically update.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-title">🕒 Schedules & Sites</div>
+                    <p class="feature-desc">Check upcoming match times, court assignments, and referee duties.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-title">🏆 Live Brackets</div>
+                    <p class="feature-desc">Follow teams as they advance through the Gold, Silver, and Bronze divisions.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-title">🏐 Match Scores</div>
+                    <p class="feature-desc">View real-time set scores and final game results instantly.</p>
+                </div>
+            </div>
+            
+            <div class="footer-url">
+                Or visit directly at:<br/>
+                <span style="color: #0f172a;">sports-ski-matics.vercel.app/?t=${tournamentSlug}</span>
+            </div>
+        </div>
+    </body>
+    </html>
+    `;
+
+    printWin.document.write(html);
+    printWin.document.close();
+    
+    // Allow the external QR Code image a moment to load before firing the print dialog
+    setTimeout(() => {
+        printWin.focus();
+        printWin.print();
+    }, 600);
 }

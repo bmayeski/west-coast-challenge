@@ -286,7 +286,7 @@ function renderCanvas(canvasId, selectId, isAdmin) {
 
     const bracketStyles = `
         <style>
-            .bracket-viewport-class { width: 100%; height: 100%; min-height: 350px; background: var(--surface-dark); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; cursor: grab; user-select: none; }
+            .bracket-viewport-class { width: 100%; height: 100%; min-height: 350px; background: var(--surface-dark); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; cursor: grab; user-select: none; touch-action: none; }
             .bracket-viewport-class:active { cursor: grabbing; }
             .bracket-surface-class { display: inline-block; padding: 10px; transform-origin: 0 0; transition: transform 0.1s ease-out; }
             .bracket-tree { display: flex; gap: 80px; align-items: stretch; min-width: max-content; }
@@ -526,22 +526,29 @@ function initPanAndZoom(canvasId) {
     const surface = document.getElementById(`${canvasId}-surface`);
     if (!viewport || !surface) return;
 
-    let scale = 1, translateX = 0, translateY = 0, isDragging = false, startX, startY;
+    let scale = 1, translateX = 0, translateY = 0;
+    let isDragging = false, startX, startY;
+    let initialPinchDistance = null, initialScale = scale;
 
-    const applyTransform = () => surface.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+    const applyTransform = () => {
+        surface.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+    };
 
+    // --- DESKTOP MOUSE ZOOM (Scroll Wheel) ---
     viewport.addEventListener('wheel', (e) => {
         e.preventDefault(); 
         const newScale = Math.min(Math.max(0.4, scale + ((e.deltaY < 0 ? 1 : -1) * 0.1)), 2.0); 
         const rect = viewport.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
+        
         translateX = mouseX - (mouseX - translateX) * (newScale / scale);
         translateY = mouseY - (mouseY - translateY) * (newScale / scale);
         scale = newScale;
         applyTransform();
     }, { passive: false });
 
+    // --- DESKTOP MOUSE PAN ---
     viewport.addEventListener('mousedown', (e) => {
         isDragging = true;
         startX = e.clientX - translateX;
@@ -566,6 +573,65 @@ function initPanAndZoom(canvasId) {
 
     viewport.addEventListener('mouseup', stopDragging);
     viewport.addEventListener('mouseleave', stopDragging);
+
+    // --- MOBILE TOUCH PAN & PINCH-TO-ZOOM ---
+    viewport.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+            // Single finger = Pan
+            isDragging = true;
+            startX = e.touches[0].clientX - translateX;
+            startY = e.touches[0].clientY - translateY;
+            surface.style.transition = 'none';
+        } else if (e.touches.length === 2) {
+            // Two fingers = Pinch to Zoom
+            isDragging = false; // Cancel pan when pinching
+            initialPinchDistance = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+            initialScale = scale;
+            surface.style.transition = 'none';
+        }
+    }, { passive: false });
+
+    viewport.addEventListener('touchmove', (e) => {
+        e.preventDefault(); // Prevent the whole webpage from scrolling while swiping on the bracket
+        
+        if (e.touches.length === 1 && isDragging) {
+            // Execute Pan
+            translateX = e.touches[0].clientX - startX;
+            translateY = e.touches[0].clientY - startY;
+            applyTransform();
+        } else if (e.touches.length === 2 && initialPinchDistance) {
+            // Execute Pinch to Zoom
+            const currentDistance = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+            
+            // Calculate new scale based on how far fingers moved
+            const newScale = Math.min(Math.max(0.4, initialScale * (currentDistance / initialPinchDistance)), 2.0);
+            
+            // Find the midpoint between the two fingers to zoom directly into that spot
+            const rect = viewport.getBoundingClientRect();
+            const midX = ((e.touches[0].clientX + e.touches[1].clientX) / 2) - rect.left;
+            const midY = ((e.touches[0].clientY + e.touches[1].clientY) / 2) - rect.top;
+
+            translateX = midX - (midX - translateX) * (newScale / scale);
+            translateY = midY - (midY - translateY) * (newScale / scale);
+            scale = newScale;
+            applyTransform();
+        }
+    }, { passive: false });
+
+    viewport.addEventListener('touchend', (e) => {
+        if (e.touches.length < 2) {
+            initialPinchDistance = null; // Reset pinch if a finger is lifted
+        }
+        if (e.touches.length === 0) {
+            stopDragging(); // Reset pan if all fingers are lifted
+        }
+    });
 }
 
 export function initBracketAdmin() {
