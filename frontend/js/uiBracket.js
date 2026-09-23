@@ -2,7 +2,6 @@
 import { supabase } from './supabaseClient.js';
 import { getPools, getTeams, getMatches, getTournamentData, getTournamentId } from './state.js';
 import { getAllPoolStandings } from './uiMath.js';
-import { ensureReadableColor } from './utils.js';
 
 // SMART GATEKEEPER
 const isSeedLocked = (poolId, rankIndex, poolStandings) => {
@@ -36,16 +35,20 @@ const isSeedLocked = (poolId, rankIndex, poolStandings) => {
     return true;
 };
 
-const formatTime = (startTime, durationMinutes, offsetMultiplier) => {
-    if (!startTime) return 'TBD';
-    const [hours, minutes] = startTime.split(':').map(Number);
-    const date = new Date();
-    date.setHours(hours, minutes + (durationMinutes * offsetMultiplier), 0);
-    let h = date.getHours();
-    const m = date.getMinutes().toString().padStart(2, '0');
+const addMinutesToTime = (timeStr, minsToAdd) => {
+    if (!timeStr || !timeStr.includes(':')) return '00:00';
+    const [h, m] = timeStr.split(':').map(Number);
+    const d = new Date();
+    d.setHours(h, m + minsToAdd, 0);
+    return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+};
+
+const formatDisplayTime = (time24) => {
+    if (!time24 || !time24.includes(':')) return 'TBD';
+    let [h, m] = time24.split(':').map(Number);
     const ampm = h >= 12 ? 'PM' : 'AM';
     h = h % 12 || 12;
-    return `${h}:${m} ${ampm}`;
+    return `${h}:${m.toString().padStart(2, '0')} ${ampm}`;
 };
 
 export function renderBracketView() {
@@ -56,14 +59,12 @@ export function renderBracketView() {
 export function populateBracketAdminConfig() {
     const tournamentData = getTournamentData(); 
     
-    // Polling safeguard: Wait until data actually arrives
     if (!tournamentData || Object.keys(tournamentData).length === 0) {
         setTimeout(populateBracketAdminConfig, 200);
         return;
     }
     
     let existingConfig = tournamentData.bracket_config || {}; 
-    
     if (typeof existingConfig === 'string') {
         try { existingConfig = JSON.parse(existingConfig); } catch(e) {}
     }
@@ -71,35 +72,50 @@ export function populateBracketAdminConfig() {
     const startInput = document.getElementById('bracketStartTime');
     if (startInput) startInput.value = existingConfig.start || '13:00';
     
-    const durationInput = document.getElementById('bracketDuration');
-    if (durationInput) durationInput.value = existingConfig.duration || '60';
-    
-    if (document.getElementById('locGold')) document.getElementById('locGold').value = existingConfig.locGold || '';
-    if (document.getElementById('locSilver')) document.getElementById('locSilver').value = existingConfig.locSilver || '';
-    if (document.getElementById('locBronze')) document.getElementById('locBronze').value = existingConfig.locBronze || '';
-    if (document.getElementById('refMatch1')) document.getElementById('refMatch1').value = existingConfig.refMatch1 || 'pC:r2';
-    if (document.getElementById('refMatch2')) document.getElementById('refMatch2').value = existingConfig.refMatch2 || 'pB:r2';
+    const poolDurInput = document.getElementById('poolDuration');
+    if (poolDurInput) poolDurInput.value = existingConfig.poolDuration || '60';
+
+    const bracketDurInput = document.getElementById('bracketDuration');
+    if (bracketDurInput) bracketDurInput.value = existingConfig.bracketDuration || '60';
     
     const seedingInput = document.getElementById('hasSeedingRounds');
-    // Fallback to the old column if the JSON object doesn't have it yet
     if (seedingInput) seedingInput.value = existingConfig.seeding || (tournamentData.has_seeding_rounds ? 'Yes' : 'No');
     
     const formatInput = document.getElementById('bracketFormat');
     if (formatInput) {
-        // Fix the '1-Day' vs '1day' HTML mismatch
         let savedFormat = existingConfig.format || tournamentData.format || '1day';
         if (savedFormat === '1-Day') savedFormat = '1day';
         formatInput.value = savedFormat;
     }
 
-    // Populate Advancement Routing
-    if (existingConfig.routing) {
-        document.querySelectorAll('.routing-select').forEach(select => {
-            const rank = select.dataset.rank;
-            if (existingConfig.routing[rank]) {
-                select.value = existingConfig.routing[rank];
-            }
-        });
+    const divInput = document.getElementById('bracketDivisions');
+    if (divInput) divInput.value = existingConfig.divisions || '2';
+
+    const site1Name = document.getElementById('site1Name');
+    if (site1Name) site1Name.value = existingConfig.site1Name || '';
+    const site1Color = document.getElementById('site1Color');
+    const site1Hex = document.getElementById('site1Hex');
+    if (site1Color && site1Hex) {
+        site1Color.value = existingConfig.site1Color || '#3b82f6';
+        site1Hex.value = existingConfig.site1Color || '#3b82f6';
+    }
+
+    const site2Name = document.getElementById('site2Name');
+    if (site2Name) site2Name.value = existingConfig.site2Name || '';
+    const site2Color = document.getElementById('site2Color');
+    const site2Hex = document.getElementById('site2Hex');
+    if (site2Color && site2Hex) {
+        site2Color.value = existingConfig.site2Color || '#ef4444';
+        site2Hex.value = existingConfig.site2Color || '#ef4444';
+    }
+
+    const site3Name = document.getElementById('site3Name');
+    if (site3Name) site3Name.value = existingConfig.site3Name || '';
+    const site3Color = document.getElementById('site3Color');
+    const site3Hex = document.getElementById('site3Hex');
+    if (site3Color && site3Hex) {
+        site3Color.value = existingConfig.site3Color || '#22c55e';
+        site3Hex.value = existingConfig.site3Color || '#22c55e';
     }
 }
 
@@ -112,22 +128,30 @@ function renderCanvas(canvasId, selectId, isAdmin) {
     canvas.style.border = 'none';
 
     const tourneyData = getTournamentData();
-    const config = tourneyData?.bracket_config || { start: '13:00', duration: 60 };
+    const config = tourneyData?.bracket_config || { start: '13:00', bracketDuration: 60, poolDuration: 60, divisions: '2' };
     const savedScores = tourneyData?.bracket_scores || {}; 
     const hasSeeding = config.seeding === 'Yes' || tourneyData?.has_seeding_rounds === true;
+    const activeDivisions = config.divisions || '2';
 
     const divisionSelect = document.getElementById(selectId);
     let selectedDivision = 'gold'; 
     
     if (divisionSelect) {
         const currentVal = divisionSelect.value || 'gold';
-        let html = `<option value="gold" ${currentVal === 'gold' ? 'selected' : ''}>Gold Division${config.locGold ? ' - ' + config.locGold : ''}</option>`;
-        html += `<option value="silver" ${currentVal === 'silver' ? 'selected' : ''}>Silver Division${config.locSilver ? ' - ' + config.locSilver : ''}</option>`;
-        if (config.locBronze || currentVal === 'bronze') {
-             html += `<option value="bronze" ${currentVal === 'bronze' ? 'selected' : ''}>Bronze Division${config.locBronze ? ' - ' + config.locBronze : ''}</option>`;
+        let html = `<option value="gold" ${currentVal === 'gold' ? 'selected' : ''}>Gold Division</option>`;
+        html += `<option value="silver" ${currentVal === 'silver' ? 'selected' : ''}>Silver Division</option>`;
+        
+        if (activeDivisions === '3') {
+            html += `<option value="bronze" ${currentVal === 'bronze' ? 'selected' : ''}>Bronze Division</option>`;
         }
+        
         divisionSelect.innerHTML = html;
         selectedDivision = divisionSelect.value;
+
+        if (selectedDivision === 'bronze' && activeDivisions !== '3') {
+            selectedDivision = 'gold';
+            divisionSelect.value = 'gold';
+        }
 
         if (!divisionSelect.dataset.listenerAttached) {
             divisionSelect.addEventListener('change', () => renderBracketView());
@@ -151,111 +175,66 @@ function renderCanvas(canvasId, selectId, isAdmin) {
         r1 = 5; r2 = 6; prefix = 'B';
     }
 
-    const timeSeed1 = formatTime(config.start, config.duration, 0); 
-    const timeSeed2 = formatTime(config.start, config.duration, 1); 
-    const qfTime1 = formatTime(config.start, config.duration, hasSeeding ? 2 : 0); 
-    const qfTime2 = formatTime(config.start, config.duration, hasSeeding ? 3 : 1);
-    const sfTime = formatTime(config.start, config.duration, hasSeeding ? 4 : 2);
-    const finalTime = formatTime(config.start, config.duration, hasSeeding ? 5 : 3);
-
-    const getRefSeed = (val) => {
-        if (!val) return 'TBD';
-        const [poolKey, rankKey] = val.split(':');
-        const poolId = poolKey === 'pA' ? pA : poolKey === 'pB' ? pB : poolKey === 'pC' ? pC : pD;
-        const rank = rankKey === 'r1' ? r1 : r2;
-        return `seed:${poolId}:${rank}`;
-    };
-
-    // LOGIC FIX: Check locations to force traveling teams to play in the FIRST time slot.
-    const divSite = selectedDivision === 'gold' ? config.locGold : selectedDivision === 'silver' ? config.locSilver : config.locBronze;
-    const pASite = pools.find(p => p.id === pA)?.site || '';
-    const pCSite = pools.find(p => p.id === pC)?.site || '';
-
-    let q1Time = qfTime1, q4Time = qfTime1;
-    let q2Time = qfTime2, q3Time = qfTime2;
-    let q1Travel = false, q2Travel = false, q3Travel = false, q4Travel = false;
-    
-    // Default Refs
-    let q1Ref = config.refMatch1 ? getRefSeed(config.refMatch1) : `seed:${pC}:${r2}`;
-    let q4Ref = config.refMatch2 ? getRefSeed(config.refMatch2) : `seed:${pD}:${r2}`;
-    let q2Ref = `loser:${prefix}1`, q3Ref = `loser:${prefix}4`;
-
-    let q1Ref_S = `loser:${prefix}S2`, q4Ref_S = `loser:${prefix}S3`;
-    let q2Ref_S = `loser:${prefix}1`, q3Ref_S = `loser:${prefix}4`;
-
-    if (divSite) {
-        const poolATravels = pASite && pASite.toLowerCase() !== divSite.toLowerCase();
-        const poolCTravels = pCSite && pCSite.toLowerCase() !== divSite.toLowerCase();
-
-        if (!poolATravels && poolCTravels) {
-            // C/D travels: They play first, A/B plays second. Swap all times and refs symmetrically.
-            q1Time = qfTime2; q4Time = qfTime2;
-            q2Time = qfTime1; q3Time = qfTime1;
-            q2Travel = divSite; q3Travel = divSite;
-
-            q2Ref = config.refMatch1 ? getRefSeed(config.refMatch1) : `seed:${pA}:${r2}`;
-            q3Ref = config.refMatch2 ? getRefSeed(config.refMatch2) : `seed:${pB}:${r2}`;
-            q1Ref = `loser:${prefix}2`;
-            q4Ref = `loser:${prefix}3`;
-
-            q2Ref_S = `loser:${prefix}S1`;
-            q3Ref_S = `loser:${prefix}S4`;
-            q1Ref_S = `loser:${prefix}2`;
-            q4Ref_S = `loser:${prefix}3`;
-        } else if (poolATravels && !poolCTravels) {
-            // A/B travels: They already play first by default. Just apply badges.
-            q1Travel = divSite; q4Travel = divSite;
-        } else if (poolATravels && poolCTravels) {
-            q1Travel = divSite; q4Travel = divSite;
-            q2Travel = divSite; q3Travel = divSite;
-        }
-    }
-
-    const sVal = (id) => savedScores[id]?.setsA !== undefined ? savedScores[id].setsA : null;
-    const sValB = (id) => savedScores[id]?.setsB !== undefined ? savedScores[id].setsB : null;
+    const bDur = parseInt(config.bracketDuration || 60, 10);
+    const tSeed1 = addMinutesToTime(config.start, bDur * 0);
+    const tSeed2 = addMinutesToTime(config.start, bDur * 1);
+    const tQf1   = addMinutesToTime(config.start, bDur * (hasSeeding ? 2 : 0));
+    const tQf2   = addMinutesToTime(config.start, bDur * (hasSeeding ? 3 : 1));
+    const tSf    = addMinutesToTime(config.start, bDur * (hasSeeding ? 4 : 2));
+    const tFinal = addMinutesToTime(config.start, bDur * (hasSeeding ? 5 : 3));
 
     let bracketData = [];
 
     if (hasSeeding) {
         bracketData = [
-            // Seeding Round
-            { col: 'Seeding Round', time: timeSeed1, id: `${prefix}S1`, t1: `seed:${pA}:${r1}`, t2: `seed:${pB}:${r1}`, ref: `seed:${pD}:${r1}`, s1: sVal(`${prefix}S1`), s2: sValB(`${prefix}S1`) },
-            { col: 'Seeding Round', time: timeSeed2, id: `${prefix}S2`, t1: `seed:${pC}:${r1}`, t2: `seed:${pD}:${r1}`, ref: `loser:${prefix}S1`, s1: sVal(`${prefix}S2`), s2: sValB(`${prefix}S2`) },
-            { col: 'Seeding Round', time: timeSeed2, id: `${prefix}S3`, t1: `seed:${pA}:${r2}`, t2: `seed:${pB}:${r2}`, ref: `loser:${prefix}S4`, s1: sVal(`${prefix}S3`), s2: sValB(`${prefix}S3`) },
-            { col: 'Seeding Round', time: timeSeed1, id: `${prefix}S4`, t1: `seed:${pC}:${r2}`, t2: `seed:${pD}:${r2}`, ref: `seed:${pB}:${r2}`, s1: sVal(`${prefix}S4`), s2: sValB(`${prefix}S4`) },
-            
-            // Quarterfinals
-            { col: 'Quarterfinals', time: q1Time, id: `${prefix}1`, t1: `winner:${prefix}S1`, t2: `loser:${prefix}S4`, ref: q1Ref_S, travel: q1Travel, s1: sVal(`${prefix}1`), s2: sValB(`${prefix}1`) },
-            { col: 'Quarterfinals', time: q2Time, id: `${prefix}2`, t1: `winner:${prefix}S3`, t2: `loser:${prefix}S2`, ref: q2Ref_S, travel: q2Travel, s1: sVal(`${prefix}2`), s2: sValB(`${prefix}2`) },
-            { col: 'Quarterfinals', time: q3Time, id: `${prefix}3`, t1: `winner:${prefix}S2`, t2: `loser:${prefix}S3`, ref: q3Ref_S, travel: q3Travel, s1: sVal(`${prefix}3`), s2: sValB(`${prefix}3`) },
-            { col: 'Quarterfinals', time: q4Time, id: `${prefix}4`, t1: `winner:${prefix}S4`, t2: `loser:${prefix}S1`, ref: q4Ref_S, travel: q4Travel, s1: sVal(`${prefix}4`), s2: sValB(`${prefix}4`) },
-            
-            // Semifinals
-            { col: 'Semifinals', time: sfTime, id: `${prefix}5`, t1: `winner:${prefix}1`, t2: `winner:${prefix}2`, ref: `loser:${prefix}2`, s1: sVal(`${prefix}5`), s2: sValB(`${prefix}5`) },
-            { col: 'Semifinals', time: sfTime, id: `${prefix}6`, t1: `winner:${prefix}3`, t2: `winner:${prefix}4`, ref: `loser:${prefix}3`, s1: sVal(`${prefix}6`), s2: sValB(`${prefix}6`) },
-            
-            // Finals
-            { col: 'Finals', time: finalTime, id: `${prefix}7`, t1: `winner:${prefix}5`, t2: `winner:${prefix}6`, ref: `loser:${prefix}5`, s1: sVal(`${prefix}7`), s2: sValB(`${prefix}7`) }
+            { col: 'Seeding Round', rawTime: tSeed1, id: `${prefix}S1`, t1: `seed:${pA}:${r1}`, t2: `seed:${pB}:${r1}`, ref: `seed:${pD}:${r1}` },
+            { col: 'Seeding Round', rawTime: tSeed2, id: `${prefix}S2`, t1: `seed:${pC}:${r1}`, t2: `seed:${pD}:${r1}`, ref: `loser:${prefix}S1` },
+            { col: 'Seeding Round', rawTime: tSeed2, id: `${prefix}S3`, t1: `seed:${pA}:${r2}`, t2: `seed:${pB}:${r2}`, ref: `loser:${prefix}S4` },
+            { col: 'Seeding Round', rawTime: tSeed1, id: `${prefix}S4`, t1: `seed:${pC}:${r2}`, t2: `seed:${pD}:${r2}`, ref: `seed:${pB}:${r2}` },
+            { col: 'Quarterfinals', rawTime: tQf1, id: `${prefix}1`, t1: `winner:${prefix}S1`, t2: `loser:${prefix}S4`, ref: `loser:${prefix}S2` },
+            { col: 'Quarterfinals', rawTime: tQf2, id: `${prefix}2`, t1: `winner:${prefix}S3`, t2: `loser:${prefix}S2`, ref: `loser:${prefix}1` },
+            { col: 'Quarterfinals', rawTime: tQf2, id: `${prefix}3`, t1: `winner:${prefix}S2`, t2: `loser:${prefix}S3`, ref: `loser:${prefix}4` },
+            { col: 'Quarterfinals', rawTime: tQf1, id: `${prefix}4`, t1: `winner:${prefix}S4`, t2: `loser:${prefix}S1`, ref: `loser:${prefix}S3` },
+            { col: 'Semifinals', rawTime: tSf, id: `${prefix}5`, t1: `winner:${prefix}1`, t2: `winner:${prefix}2`, ref: `loser:${prefix}2` },
+            { col: 'Semifinals', rawTime: tSf, id: `${prefix}6`, t1: `winner:${prefix}3`, t2: `winner:${prefix}4`, ref: `loser:${prefix}3` },
+            { col: 'Finals', rawTime: tFinal, id: `${prefix}7`, t1: `winner:${prefix}5`, t2: `winner:${prefix}6`, ref: `loser:${prefix}5` }
         ];
     } else {
         bracketData = [
-            // Quarterfinals
-            { col: 'Quarterfinals', time: q1Time, id: `${prefix}1`, t1: `seed:${pA}:${r1}`, t2: `seed:${pB}:${r2}`, ref: q1Ref, travel: q1Travel, s1: sVal(`${prefix}1`), s2: sValB(`${prefix}1`) },
-            { col: 'Quarterfinals', time: q2Time, id: `${prefix}2`, t1: `seed:${pD}:${r1}`, t2: `seed:${pC}:${r2}`, ref: q2Ref, travel: q2Travel, s1: sVal(`${prefix}2`), s2: sValB(`${prefix}2`) },
-            { col: 'Quarterfinals', time: q3Time, id: `${prefix}3`, t1: `seed:${pC}:${r1}`, t2: `seed:${pD}:${r2}`, ref: q3Ref, travel: q3Travel, s1: sVal(`${prefix}3`), s2: sValB(`${prefix}3`) },
-            { col: 'Quarterfinals', time: q4Time, id: `${prefix}4`, t1: `seed:${pB}:${r1}`, t2: `seed:${pA}:${r2}`, ref: q4Ref, travel: q4Travel, s1: sVal(`${prefix}4`), s2: sValB(`${prefix}4`) },
-            
-            // Semifinals
-            { col: 'Semifinals', time: sfTime, id: `${prefix}5`, t1: `winner:${prefix}1`, t2: `winner:${prefix}2`, ref: `loser:${prefix}2`, s1: sVal(`${prefix}5`), s2: sValB(`${prefix}5`) },
-            { col: 'Semifinals', time: sfTime, id: `${prefix}6`, t1: `winner:${prefix}3`, t2: `winner:${prefix}4`, ref: `loser:${prefix}3`, s1: sVal(`${prefix}6`), s2: sValB(`${prefix}6`) },
-            
-            // Finals
-            { col: 'Finals', time: finalTime, id: `${prefix}7`, t1: `winner:${prefix}5`, t2: `winner:${prefix}6`, ref: `loser:${prefix}5`, s1: sVal(`${prefix}7`), s2: sValB(`${prefix}7`) }
+            { col: 'Quarterfinals', rawTime: tQf1, id: `${prefix}1`, t1: `seed:${pA}:${r1}`, t2: `seed:${pB}:${r2}`, ref: `seed:${pC}:${r2}` },
+            { col: 'Quarterfinals', rawTime: tQf2, id: `${prefix}2`, t1: `seed:${pD}:${r1}`, t2: `seed:${pC}:${r2}`, ref: `loser:${prefix}1` },
+            { col: 'Quarterfinals', rawTime: tQf2, id: `${prefix}3`, t1: `seed:${pC}:${r1}`, t2: `seed:${pD}:${r2}`, ref: `loser:${prefix}4` },
+            { col: 'Quarterfinals', rawTime: tQf1, id: `${prefix}4`, t1: `seed:${pB}:${r1}`, t2: `seed:${pA}:${r2}`, ref: `seed:${pD}:${r2}` },
+            { col: 'Semifinals', rawTime: tSf, id: `${prefix}5`, t1: `winner:${prefix}1`, t2: `winner:${prefix}2`, ref: `loser:${prefix}2` },
+            { col: 'Semifinals', rawTime: tSf, id: `${prefix}6`, t1: `winner:${prefix}3`, t2: `winner:${prefix}4`, ref: `loser:${prefix}3` },
+            { col: 'Finals', rawTime: tFinal, id: `${prefix}7`, t1: `winner:${prefix}5`, t2: `winner:${prefix}6`, ref: `loser:${prefix}5` }
         ];
+    }
+
+    bracketData = bracketData.map(m => {
+        const raw = savedScores[m.id] || {};
+        return {
+            ...m,
+            time24: raw.timeOverride || m.rawTime,
+            ref: raw.refOverride || m.ref,
+            site: raw.siteOverride || null,
+            court: raw.courtOverride || null,
+            s1: raw.setsA !== undefined ? raw.setsA : null,
+            s2: raw.setsB !== undefined ? raw.setsB : null
+        };
+    });
+
+    if (isAdmin) {
+        window.activeBracketState = bracketData;
     }
 
     const resolveTeam = (teamRef) => {
         if (!teamRef) return { name: 'TBD', color: '#64748b', logo: null, resolved: false };
+        
+        const teams = getTeams();
+        const teamObj = teams.find(t => t.id === teamRef);
+        if (teamObj) return { name: teamObj.name, color: teamObj.color, logo: teamObj.logo_id, resolved: true };
+
         if (typeof teamRef === 'string' && teamRef.startsWith('seed:')) {
             const parts = teamRef.split(':');
             const poolId = parts[1];
@@ -274,6 +253,17 @@ function renderCanvas(canvasId, selectId, isAdmin) {
         }
         if (typeof teamRef === 'string' && (teamRef.startsWith('winner:') || teamRef.startsWith('loser:'))) {
             const [type, matchId] = teamRef.split(':');
+            
+            const targetPrefix = matchId.charAt(0);
+            const targetNum = matchId.slice(1);
+            let targetDivName = targetPrefix === 'G' ? 'Gold' : targetPrefix === 'S' ? 'Silver' : 'Bronze';
+            
+            const typeStr = type === 'winner' ? 'Winner' : 'Loser';
+            const isCrossDivision = targetPrefix !== prefix;
+            const fallbackName = isCrossDivision 
+                ? `${typeStr} Match ${targetNum} (${targetDivName})`
+                : `${typeStr} Match ${targetNum}`;
+            
             const targetMatch = bracketData.find(m => m.id === matchId);
             if (targetMatch && targetMatch.s1 !== null && targetMatch.s2 !== null) {
                 if (targetMatch.s1 !== targetMatch.s2) {
@@ -285,8 +275,7 @@ function renderCanvas(canvasId, selectId, isAdmin) {
                     }
                 }
             }
-            const typeStr = type === 'winner' ? 'Winner' : 'Loser';
-            return { name: `${typeStr} Match ${matchId.replace(prefix, '')}`, color: '#64748b', logo: null, resolved: false };
+            return { name: fallbackName, color: '#64748b', logo: null, resolved: false };
         }
         return { name: teamRef, color: '#64748b', logo: null, resolved: false };
     };
@@ -296,24 +285,33 @@ function renderCanvas(canvasId, selectId, isAdmin) {
             .bracket-viewport-class { width: 100%; height: 100%; min-height: 350px; background: var(--surface-dark); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; cursor: grab; user-select: none; }
             .bracket-viewport-class:active { cursor: grabbing; }
             .bracket-surface-class { display: inline-block; padding: 10px; transform-origin: 0 0; transition: transform 0.1s ease-out; }
-            .bracket-tree { display: flex; gap: 20px; align-items: stretch; min-width: max-content; }
-            .bracket-column { display: flex; flex-direction: column; } 
-            .bracket-matches { display: flex; flex-direction: column; flex-grow: 1; justify-content: space-around; gap: 8px; }
-            .bracket-col-title { color: var(--accent-orange); font-weight: bold; font-size: 0.8rem; text-align: center; margin-bottom: 5px; text-transform: uppercase; }
-            .bracket-card { width: 220px; background: #1e293b; border-radius: 6px; border: 1px solid #334155; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.2); display: flex; flex-direction: column; }
+            .bracket-tree { display: flex; gap: 80px; align-items: stretch; min-width: max-content; }
+            .bracket-column { display: flex; flex-direction: column; width: 240px; } 
+            .bracket-matches { display: flex; flex-direction: column; flex-grow: 1; margin: 0; padding: 10px 0; }
+            .bracket-col-title { color: var(--accent-orange); font-weight: bold; font-size: 0.8rem; text-align: center; margin-bottom: 2px; text-transform: uppercase; }
+            .bracket-card { width: 100%; background: #1e293b; border-radius: 6px; border: 1px solid #334155; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.2); display: flex; flex-direction: row; z-index: 2; position: relative; }
             .bracket-header { display: flex; justify-content: space-between; align-items: center; padding: 3px 8px; background: #0f172a; border-bottom: 1px solid #334155; }
-            .bracket-time { color: var(--accent-orange); font-size: 0.7rem; font-weight: bold; pointer-events: none; }
+            .bracket-time { font-size: 0.7rem; font-weight: bold; pointer-events: none; }
             .bracket-id { color: #64748b; font-size: 0.65rem; font-weight: bold; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; pointer-events: none; }
             .bracket-teams-container { padding: 3px; border-bottom: 1px solid #334155; display: flex; flex-direction: column; gap: 1px; }
             .bracket-team-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; border-radius: 4px; border: 1px solid transparent; }
             .bracket-team-info { display: flex; align-items: center; gap: 6px; color: white; font-size: 0.8rem; font-weight: bold; pointer-events: none; }
             .bracket-score { font-weight: bold; font-size: 0.85rem; pointer-events: none; }
-            .bracket-ref { text-align: center; padding: 3px; font-size: 0.65rem; color: #64748b; pointer-events: none; }
-            .bracket-ref-team { color: var(--accent-orange); font-weight: bold; }
+            .bracket-ref-team { font-weight: bold; }
         </style>
     `;
 
-    const createMatchCard = (match) => {
+    const getSiteColor = (siteName) => {
+        if (!siteName) return '#475569'; 
+        if (siteName === config.site1Name) return config.site1Color || '#3b82f6';
+        if (siteName === config.site2Name) return config.site2Color || '#ef4444';
+        if (siteName === config.site3Name) return config.site3Color || '#22c55e';
+        return '#475569';
+    };
+
+    const visibleColumns = hasSeeding ? ['Seeding Round', 'Quarterfinals', 'Semifinals', 'Finals'] : ['Quarterfinals', 'Semifinals', 'Finals'];
+
+    const createMatchCard = (match, index, colIndex, isStraight) => {
         const team1 = resolveTeam(match.t1);
         const team2 = resolveTeam(match.t2);
         const refTeam = resolveTeam(match.ref);
@@ -333,16 +331,80 @@ function renderCanvas(canvasId, selectId, isAdmin) {
             return `<div style="width: 14px; height: 14px; border-radius: 50%; background: ${team.color || '#475569'};"></div>`;
         };
 
-        const adminEditButton = isAdmin ? `
-            <button class="btn edit-bracket-match-btn" data-match-id="${match.id}" data-t1="${team1.name}" data-t2="${team2.name}" 
-            style="width: 100%; padding: 4px; font-size: 0.75rem; background: rgba(255,255,255,0.05); color: white; border: none; border-top: 1px solid #334155; cursor: pointer; border-radius: 0; margin-top: auto;">
-            ✏️ Edit Match
-            </button>
-        ` : '';
+        const textAccent = match.site ? getSiteColor(match.site) : 'var(--accent-orange)';
 
-        const travelBadge = match.travel 
-            ? `<div style="background: rgba(242, 105, 34, 0.15); color: var(--accent-orange); font-size: 0.65rem; text-align: center; padding: 4px; border-top: 1px solid #334155; font-weight: bold; letter-spacing: 0.5px; margin-top: auto;">🚗 WINNER TRAVELS TO ${match.travel.toUpperCase()}</div>`
-            : '';
+        let adminEditButton = '';
+        if (isAdmin) {
+            adminEditButton = `
+            <div style="display: flex; flex-direction: column; width: 32px; flex-shrink: 0; border-left: 1px solid #334155; background: rgba(0,0,0,0.2);">
+                <button class="btn edit-bracket-details-btn" data-match-id="${match.id}" data-t1="${team1.name}" data-t2="${team2.name}" data-time="${match.time24}" data-site="${match.site || ''}" data-court="${match.court || ''}" 
+                style="flex: 1; padding: 0; font-size: 1.1rem; border: none; border-bottom: 1px solid #334155; cursor: pointer; border-radius: 0; background: transparent; display: flex; align-items: center; justify-content: center;" title="Edit Match Details">
+                ⚙️
+                </button>
+                <button class="btn edit-bracket-score-btn" data-match-id="${match.id}" data-t1="${team1.name}" data-t2="${team2.name}" 
+                style="flex: 1; padding: 0; font-size: 1.1rem; border: none; cursor: pointer; border-radius: 0; background: transparent; display: flex; align-items: center; justify-content: center;" title="Input Scores">
+                🔢
+                </button>
+            </div>
+            `;
+        }
+
+        let locationBadge = '';
+        if (match.site || match.court) {
+            const siteColor = getSiteColor(match.site);
+            let courtText = '';
+            if (match.court) {
+                courtText = `(Court ${match.court})`;
+            }
+            locationBadge = `<div style="background: color-mix(in srgb, ${siteColor} 15%, transparent); color: ${siteColor}; font-size: 0.65rem; text-align: center; padding: 4px; border-top: 1px solid #334155; font-weight: bold; letter-spacing: 0.5px; margin-top: auto;">📍 ${match.site || ''} ${courtText}</div>`;
+        }
+
+        let feederLine = '';
+        if (colIndex < visibleColumns.length - 1) { 
+            const startColor = getSiteColor(match.site);
+            let endColor = '#475569';
+            
+            const nextMatch = bracketData.find(n => n.t1 === `winner:${match.id}` || n.t2 === `winner:${match.id}`);
+            if (nextMatch && nextMatch.site) {
+                endColor = getSiteColor(nextMatch.site);
+            }
+
+            const lineWidth = '3';
+
+            if (isStraight) {
+                feederLine = `
+                <div style="position: absolute; left: 100%; top: 50%; width: 80px; height: 100%; transform: translateY(-50%); z-index: 0; pointer-events: none;">
+                    <svg width="100%" height="100%" style="overflow: visible;">
+                        <defs>
+                            <linearGradient id="grad_${canvasId}_${match.id}" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stop-color="${startColor}" />
+                                <stop offset="100%" stop-color="${endColor}" />
+                            </linearGradient>
+                        </defs>
+                        <line x1="0" y1="50%" x2="100%" y2="50%" stroke="url(#grad_${canvasId}_${match.id})" stroke-width="${lineWidth}" vector-effect="non-scaling-stroke" />
+                    </svg>
+                </div>
+                `;
+            } else {
+                const isTop = index % 2 === 0;
+                const topCss = isTop ? 'top: 50%;' : 'bottom: 50%;';
+                const d = isTop ? 'M 0,0 C 50,0 50,100 100,100' : 'M 0,100 C 50,100 50,0 100,0';
+
+                feederLine = `
+                <div style="position: absolute; left: 100%; ${topCss} width: 80px; height: 50%; z-index: 0; pointer-events: none;">
+                    <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style="overflow: visible; position: absolute; top: 0; left: 0;">
+                        <defs>
+                            <linearGradient id="grad_${canvasId}_${match.id}" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stop-color="${startColor}" />
+                                <stop offset="100%" stop-color="${endColor}" />
+                            </linearGradient>
+                        </defs>
+                        <path d="${d}" fill="none" stroke="url(#grad_${canvasId}_${match.id})" stroke-width="${lineWidth}" vector-effect="non-scaling-stroke" />
+                    </svg>
+                </div>
+                `;
+            }
+        }
 
         const raw = savedScores[match.id] || {};
         let scoresText = [];
@@ -352,46 +414,90 @@ function renderCanvas(canvasId, selectId, isAdmin) {
         const scoresDisplay = scoresText.join(' <span style="color:#475569;">|</span> ');
 
         return `
-        <div class="bracket-card">
-            <div class="bracket-header">
-                <span class="bracket-time">🕒 ${match.time}</span>
-                <span class="bracket-id">Match ${match.id.replace(prefix, '')}</span>
-            </div>
-            <div class="bracket-teams-container">
-                <div class="bracket-team-row" style="${t1RowStyle}">
-                    <div class="bracket-team-info" style="${t1Text}">
-                        ${renderTeamBadge(team1)} ${team1.name}
+        <div class="match-slot" style="display: flex; flex-direction: column; justify-content: center; position: relative; flex: 1; width: 100%; min-height: 90px; padding: 6px 0; box-sizing: border-box;">
+            <div class="bracket-card">
+                <div style="display: flex; flex-direction: column; flex-grow: 1; min-width: 0;">
+                    <div class="bracket-header">
+                        <span class="bracket-time" style="color: ${textAccent};">🕒 ${formatDisplayTime(match.time24)}</span>
+                        <span class="bracket-id">Match ${match.id.replace(prefix, '')}</span>
                     </div>
-                    <span class="bracket-score" style="${t1Text}">${match.s1 !== null ? match.s1 : '-'}</span>
-                </div>
-                <div class="bracket-team-row" style="${t2RowStyle}">
-                    <div class="bracket-team-info" style="${t2Text}">
-                        ${renderTeamBadge(team2)} ${team2.name}
+                    <div class="bracket-teams-container">
+                        <div class="bracket-team-row" style="${t1RowStyle}">
+                            <div class="bracket-team-info" style="${t1Text}">
+                                ${renderTeamBadge(team1)} ${team1.name}
+                            </div>
+                            <span class="bracket-score" style="${t1Text}">${match.s1 !== null ? match.s1 : '-'}</span>
+                        </div>
+                        <div class="bracket-team-row" style="${t2RowStyle}">
+                            <div class="bracket-team-info" style="${t2Text}">
+                                ${renderTeamBadge(team2)} ${team2.name}
+                            </div>
+                            <span class="bracket-score" style="${t2Text}">${match.s2 !== null ? match.s2 : '-'}</span>
+                        </div>
                     </div>
-                    <span class="bracket-score" style="${t2Text}">${match.s2 !== null ? match.s2 : '-'}</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; font-size: 0.65rem; color: #64748b; background: rgba(0,0,0,0.15);">
+                        <div style="display: flex; flex-direction: column; gap: 2px;">
+                            <div>Ref: <span class="bracket-ref-team" style="color: ${textAccent};">${refTeam.name}</span></div>
+                        </div>
+                        <div style="text-align: right; color: #94a3b8; font-weight: 500; letter-spacing: 0.5px;">
+                            ${scoresDisplay}
+                        </div>
+                    </div>
+                    ${locationBadge}
                 </div>
+                ${adminEditButton}
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; font-size: 0.65rem; color: #64748b; background: rgba(0,0,0,0.15);">
-                <div>Ref: <span class="bracket-ref-team">${refTeam.name}</span></div>
-                <div style="color: #94a3b8; font-weight: 500; letter-spacing: 0.5px;">${scoresDisplay}</div>
-            </div>
-            ${travelBadge}
-            ${adminEditButton}
+            ${feederLine}
         </div>
         `;
     };
 
     let columnsHtml = '';
-    const visibleColumns = hasSeeding ? ['Seeding Round', 'Quarterfinals', 'Semifinals', 'Finals'] : ['Quarterfinals', 'Semifinals', 'Finals'];
     
-    visibleColumns.forEach(colName => {
+    visibleColumns.forEach((colName, colIndex) => {
         const colMatches = bracketData.filter(m => m.col === colName);
         if (colMatches.length > 0) {
+            
+            const nextColName = visibleColumns[colIndex + 1];
+            const nextColMatches = nextColName ? bracketData.filter(m => m.col === nextColName) : [];
+            const isStraight = nextColMatches.length === colMatches.length;
+
+            let pairsHtml = '';
+            if (isStraight) {
+                colMatches.forEach((m) => {
+                    pairsHtml += `
+                    <div style="display: flex; flex-direction: column; justify-content: center; position: relative; flex-grow: 1;">
+                        ${createMatchCard(m, 0, colIndex, true)}
+                    </div>
+                    `;
+                });
+            } else {
+                for (let i = 0; i < colMatches.length; i += 2) {
+                    const m1 = colMatches[i];
+                    const m2 = colMatches[i+1];
+                    
+                    if (m2) {
+                        pairsHtml += `
+                        <div style="display: flex; flex-direction: column; justify-content: center; position: relative; flex-grow: 1;">
+                            ${createMatchCard(m1, 0, colIndex, false)}
+                            ${createMatchCard(m2, 1, colIndex, false)}
+                        </div>
+                        `;
+                    } else {
+                        pairsHtml += `
+                        <div style="display: flex; flex-direction: column; justify-content: center; position: relative; flex-grow: 1;">
+                            ${createMatchCard(m1, 0, colIndex, false)}
+                        </div>
+                        `;
+                    }
+                }
+            }
+
             columnsHtml += `
             <div class="bracket-column">
                 <div class="bracket-col-title">${colName}</div>
                 <div class="bracket-matches">
-                    ${colMatches.map(m => createMatchCard(m)).join('')}
+                    ${pairsHtml}
                 </div>
             </div>`;
         }
@@ -465,26 +571,23 @@ export function initBracketAdmin() {
     if (saveConfigBtn) {
         saveConfigBtn.addEventListener('click', async () => {
             const start = document.getElementById('bracketStartTime').value;
-            const duration = parseInt(document.getElementById('bracketDuration').value, 10);
-            const locGold = document.getElementById('locGold').value.trim();
-            const locSilver = document.getElementById('locSilver').value.trim();
-            const locBronze = document.getElementById('locBronze').value.trim();
-            const refMatch1 = document.getElementById('refMatch1').value;
-            const refMatch2 = document.getElementById('refMatch2').value;
-            
             const format = document.getElementById('bracketFormat')?.value || '1day';
             const seeding = document.getElementById('hasSeedingRounds')?.value || 'No';
+            const divisions = document.getElementById('bracketDivisions')?.value || '2';
             
-            // Gather Routing Assignments
-            const routing = {};
-            document.querySelectorAll('.routing-select').forEach(select => {
-                routing[select.dataset.rank] = select.value;
-            });
+            const poolDuration = parseInt(document.getElementById('poolDuration').value, 10) || 60;
+            const bracketDuration = parseInt(document.getElementById('bracketDuration').value, 10) || 60;
 
-            // Put EVERYTHING in the JSON object
+            const site1Name = document.getElementById('site1Name').value.trim();
+            const site1Color = document.getElementById('site1Color').value;
+            const site2Name = document.getElementById('site2Name').value.trim();
+            const site2Color = document.getElementById('site2Color').value;
+            const site3Name = document.getElementById('site3Name').value.trim();
+            const site3Color = document.getElementById('site3Color').value;
+
             const configObj = { 
-                start, duration, locGold, locSilver, locBronze, refMatch1, refMatch2,
-                format, seeding, routing
+                start, poolDuration, bracketDuration, format, seeding, divisions,
+                site1Name, site1Color, site2Name, site2Color, site3Name, site3Color 
             };
             
             const tournamentId = getTournamentId();
@@ -512,7 +615,7 @@ export function initBracketAdmin() {
             saveConfigBtn.innerText = '✅ Configuration Saved!';
             saveConfigBtn.style.backgroundColor = '#22c55e'; 
             setTimeout(() => {
-                saveConfigBtn.innerText = 'Save Settings';
+                saveConfigBtn.innerText = 'Save Defaults';
                 saveConfigBtn.style.backgroundColor = 'var(--accent-orange)';
             }, 2000);
             
@@ -521,11 +624,12 @@ export function initBracketAdmin() {
     }
 
     document.addEventListener('click', async (e) => {
-        const editBtn = e.target.closest('.edit-bracket-match-btn');
-        if (editBtn) {
-            const matchId = editBtn.dataset.matchId;
+        // --- 1. SCORES MODAL ---
+        const scoreBtn = e.target.closest('.edit-bracket-score-btn');
+        if (scoreBtn) {
+            const matchId = scoreBtn.dataset.matchId;
             document.getElementById('bracketScoreMatchId').value = matchId;
-            document.getElementById('bracketScoreModalMatchup').innerText = `${editBtn.dataset.t1} vs ${editBtn.dataset.t2}`;
+            document.getElementById('bracketScoreModalMatchup').innerText = `${scoreBtn.dataset.t1} vs ${scoreBtn.dataset.t2}`;
             
             const tourneyData = getTournamentData();
             const savedScores = tourneyData?.bracket_scores || {};
@@ -541,10 +645,97 @@ export function initBracketAdmin() {
             document.getElementById('editBracketScoreModal').style.display = 'flex';
         }
 
+        // --- 2. DETAILS MODAL ---
+        const detailsBtn = e.target.closest('.edit-bracket-details-btn');
+        if (detailsBtn) {
+            const matchId = detailsBtn.dataset.matchId;
+            
+            document.getElementById('detailsMatchId').value = matchId;
+            document.getElementById('bracketDetailsModalMatchup').innerText = `${detailsBtn.dataset.t1} vs ${detailsBtn.dataset.t2}`;
+            
+            const tourneyData = getTournamentData();
+            const tourneyConfig = tourneyData?.bracket_config || {};
+            const savedScores = tourneyData?.bracket_scores || {};
+            const raw = savedScores[matchId] || {};
+            
+            document.getElementById('detailsTime').value = detailsBtn.dataset.time || '';
+            document.getElementById('detailsCourt').value = raw.courtOverride || '';
+            
+            // Build Dynamic Site Dropdown
+            const siteSelect = document.getElementById('detailsSite');
+            
+            let siteOpts = '<option value="">-- Select Site --</option>';
+            
+            [tourneyConfig.site1Name, tourneyConfig.site2Name, tourneyConfig.site3Name].forEach(s => {
+                if (s) {
+                    const isSiteSelected = raw.siteOverride === s ? 'selected' : '';
+                    siteOpts += `<option value="${s}" ${isSiteSelected}>${s}</option>`;
+                }
+            });
+            siteSelect.innerHTML = siteOpts;
+
+            // Build dynamic Referee Dropdown
+            const refSelect = document.getElementById('detailsRef');
+            const teams = getTeams();
+            const pools = getPools();
+            const sortedTeams = [...teams].sort((a, b) => a.name.localeCompare(b.name));
+            
+            let refOptions = '<option value="">-- Auto-Calculated Default --</option>';
+            
+            refOptions += '<optgroup label="Placeholder Seeds">';
+            pools.forEach(pool => {
+                for (let r = 1; r <= 4; r++) {
+                    const seedVal = `seed:${pool.id}:${r}`;
+                    const isSelected = raw.refOverride === seedVal ? 'selected' : '';
+                    const rankStr = r === 1 ? '1st' : r === 2 ? '2nd' : r === 3 ? '3rd' : '4th';
+                    refOptions += `<option value="${seedVal}" ${isSelected}>${rankStr} ${pool.name}</option>`;
+                }
+            });
+            refOptions += '</optgroup>';
+
+            // Dynamically generate Loser options for ALL active divisions
+            const activeDivisions = tourneyConfig.divisions || '2';
+            const divisions = [
+                { name: 'Gold', prefix: 'G' },
+                { name: 'Silver', prefix: 'S' }
+            ];
+            if (activeDivisions === '3') divisions.push({ name: 'Bronze', prefix: 'B' });
+            
+            const hasSeeding = tourneyConfig.seeding === 'Yes' || tourneyData?.has_seeding_rounds === true;
+            let loserMatchIds = ['1', '2', '3', '4', '5', '6', '7'];
+            if (hasSeeding) loserMatchIds = ['S1', 'S2', 'S3', 'S4', ...loserMatchIds];
+
+            divisions.forEach(div => {
+                refOptions += `<optgroup label="${div.name} Division Losers">`;
+                loserMatchIds.forEach(num => {
+                    const refVal = `loser:${div.prefix}${num}`;
+                    const isSelected = raw.refOverride === refVal ? 'selected' : '';
+                    refOptions += `<option value="${refVal}" ${isSelected}>Loser of Match ${num} (${div.name})</option>`;
+                });
+                refOptions += `</optgroup>`;
+            });
+
+            refOptions += '<optgroup label="Specific Teams">';
+            sortedTeams.forEach(t => {
+                const isSelected = raw.refOverride === t.id ? 'selected' : '';
+                refOptions += `<option value="${t.id}" ${isSelected}>${t.name}</option>`;
+            });
+            refOptions += '</optgroup>';
+            
+            refSelect.innerHTML = refOptions;
+            
+            document.getElementById('editBracketDetailsModal').style.display = 'flex';
+        }
+
+        // --- CLOSING MODALS ---
         if (e.target.closest('#closeBracketScoreModalBtn')) {
             document.getElementById('editBracketScoreModal').style.display = 'none';
         }
+        if (e.target.closest('#closeBracketDetailsModalBtn')) {
+            document.getElementById('editBracketDetailsModal').style.display = 'none';
+        }
 
+        // --- SAVING SCORES ---
         if (e.target.closest('#saveBracketScoresBtn')) {
             const saveBtn = e.target.closest('#saveBracketScoresBtn');
             const originalText = saveBtn.innerText;
@@ -567,7 +758,12 @@ export function initBracketAdmin() {
             if (s3A !== null && s3B !== null) { if (s3A > s3B) setsA++; else if (s3B > s3A) setsB++; }
 
             const savedScores = tourneyData.bracket_scores || {};
-            savedScores[matchId] = { s1A, s1B, s2A, s2B, s3A, s3B, setsA, setsB };
+            if (!savedScores[matchId]) savedScores[matchId] = {};
+            
+            savedScores[matchId] = { 
+                ...savedScores[matchId], 
+                s1A, s1B, s2A, s2B, s3A, s3B, setsA, setsB 
+            };
 
             const { error } = await supabase
                 .from('tournaments')
@@ -586,8 +782,70 @@ export function initBracketAdmin() {
             renderBracketView();
         }
 
+        // --- SAVING DETAILS ---
+        if (e.target.closest('#saveBracketDetailsBtn')) {
+            const saveBtn = e.target.closest('#saveBracketDetailsBtn');
+            const matchId = document.getElementById('detailsMatchId').value;
+            const timeVal = document.getElementById('detailsTime').value;
+            const siteVal = document.getElementById('detailsSite').value.trim();
+            const courtVal = document.getElementById('detailsCourt').value.trim();
+            const refVal = document.getElementById('detailsRef').value;
+            
+            let warningMsg = '';
+
+            if (refVal) {
+                const poolMatches = getMatches();
+                const refConflictPool = poolMatches.find(m => m.time === timeVal && (m.teamA === refVal || m.teamB === refVal || m.ref === refVal));
+                if (refConflictPool) {
+                    warningMsg += '⚠️ The selected referee is already scheduled for a pool match at this time.\n';
+                }
+            }
+
+            if (siteVal && courtVal) {
+                const bracketMatches = window.activeBracketState || [];
+                const courtConflict = bracketMatches.find(m => m.id !== matchId && m.time24 === timeVal && (m.site || '') === siteVal && (m.court || '') === courtVal);
+                if (courtConflict) {
+                    warningMsg += `⚠️ Court ${courtVal} at ${siteVal} is already booked for Bracket Match ${courtConflict.id.replace(/[A-Za-z]/g, '')} at this time.\n`;
+                }
+            }
+
+            if (warningMsg) {
+                warningMsg += '\nDo you still want to save these details?';
+                if (!confirm(warningMsg)) return;
+            }
+
+            const originalText = saveBtn.innerText;
+            saveBtn.innerText = 'Saving...';
+            
+            const tournamentId = getTournamentId();
+            const tourneyData = getTournamentData();
+            if (!tournamentId || !tourneyData) return;
+
+            const savedScores = tourneyData.bracket_scores || {};
+            if (!savedScores[matchId]) savedScores[matchId] = {};
+            
+            if (timeVal) savedScores[matchId].timeOverride = timeVal; else delete savedScores[matchId].timeOverride;
+            if (siteVal) savedScores[matchId].siteOverride = siteVal; else delete savedScores[matchId].siteOverride;
+            if (courtVal) savedScores[matchId].courtOverride = courtVal; else delete savedScores[matchId].courtOverride;
+            if (refVal) savedScores[matchId].refOverride = refVal; else delete savedScores[matchId].refOverride;
+
+            const { error } = await supabase.from('tournaments').update({ bracket_scores: savedScores }).eq('id', tournamentId);
+            
+            if (error) {
+                alert("Error saving details: " + error.message);
+                saveBtn.innerText = originalText;
+                return;
+            }
+
+            tourneyData.bracket_scores = savedScores;
+            saveBtn.innerText = originalText;
+            document.getElementById('editBracketDetailsModal').style.display = 'none';
+            renderBracketView();
+        }
+
+        // --- CLEAR SCORES ---
         if (e.target.closest('#deleteBracketScoresBtn')) {
-            if (!confirm("Clear scores for this bracket match? This may pull teams out of the next round.")) return;
+            if (!confirm("Clear scores for this bracket match? (This will not delete your Time/Location overrides).")) return;
             
             const tournamentId = getTournamentId();
             const tourneyData = getTournamentData();
@@ -596,7 +854,16 @@ export function initBracketAdmin() {
             const matchId = document.getElementById('bracketScoreMatchId').value;
             const savedScores = tourneyData.bracket_scores || {};
             
-            delete savedScores[matchId];
+            if (savedScores[matchId]) {
+                delete savedScores[matchId].s1A;
+                delete savedScores[matchId].s1B;
+                delete savedScores[matchId].s2A;
+                delete savedScores[matchId].s2B;
+                delete savedScores[matchId].s3A;
+                delete savedScores[matchId].s3B;
+                delete savedScores[matchId].setsA;
+                delete savedScores[matchId].setsB;
+            }
 
             const { error } = await supabase
                 .from('tournaments')
@@ -612,5 +879,349 @@ export function initBracketAdmin() {
             document.getElementById('editBracketScoreModal').style.display = 'none';
             renderBracketView();
         }
+
+        if (e.target.closest('#printBracketsBtn')) {
+            printBrackets();
+        }
     });
+}
+
+export function printBrackets() {
+    const tournamentData = getTournamentData();
+    const pools = getPools();
+    const allTeams = typeof getTeams === 'function' ? getTeams() : [];
+    
+    let config = tournamentData?.bracket_config || {};
+    if (typeof config === 'string') {
+        try { config = JSON.parse(config); } catch(e) {}
+    }
+    
+    const activeDivisions = parseInt(config.divisions || '2', 10);
+    const hasSeeding = config.seeding === 'Yes' || tournamentData?.has_seeding_rounds === true;
+    const bracketSets = parseInt(config.bracketSets || '1', 10);
+
+    const addMinutesToTime = (timeStr, minsToAdd) => {
+        if (!timeStr) return '13:00';
+        let [h, m] = timeStr.split(':').map(Number);
+        let date = new Date(2000, 0, 1, h, m + minsToAdd, 0);
+        return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+    };
+
+    const bDur = parseInt(config.bracketDuration || 60, 10);
+    const configStart = config.start || '13:00';
+    const tSeed1 = addMinutesToTime(configStart, bDur * 0);
+    const tSeed2 = addMinutesToTime(configStart, bDur * 1);
+    const tQf1   = addMinutesToTime(configStart, bDur * (hasSeeding ? 2 : 0));
+    const tQf2   = addMinutesToTime(configStart, bDur * (hasSeeding ? 3 : 1));
+    const tSf    = addMinutesToTime(configStart, bDur * (hasSeeding ? 4 : 2));
+    const tFinal = addMinutesToTime(configStart, bDur * (hasSeeding ? 5 : 3));
+
+    const formatDisplayTime = (timeStr) => {
+        if (!timeStr) return 'Time TBD';
+        if (timeStr.includes('AM') || timeStr.includes('PM')) return timeStr;
+        let [h, m] = timeStr.split(':').map(Number);
+        if (isNaN(h)) return timeStr;
+        let ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        m = m < 10 ? '0' + m : m;
+        return `${h}:${m} ${ampm}`;
+    };
+    
+    const getSiteColor = (siteName) => {
+        if (!siteName) return '#475569'; 
+        if (siteName === config.site1Name) return config.site1Color || '#3b82f6';
+        if (siteName === config.site2Name) return config.site2Color || '#ef4444';
+        if (siteName === config.site3Name) return config.site3Color || '#22c55e';
+        return '#475569';
+    };
+
+    const printWin = window.open('', '_blank');
+    
+    let html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Brackets - ${tournamentData.name}</title>
+        <style>
+            @page { size: landscape; margin: 0.25in; }
+            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #0f172a; margin: 0; padding: 0; background: #fff; }
+            .page { page-break-after: always; display: flex; flex-direction: column; min-height: 95vh; box-sizing: border-box; overflow: hidden; }
+            .page:last-child { page-break-after: auto; }
+            
+            .header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; border-bottom: 2px solid #64748b; padding-bottom: 8px; }
+            .header h1 { margin: 0; font-size: 26px; font-weight: 900; text-transform: uppercase; color: #000; }
+            .division-badge { padding: 4px 16px; font-size: 20px; font-weight: bold; border-radius: 6px; border: 2px solid #000; color: #000; text-transform: uppercase; letter-spacing: 1px; }
+            
+            .bracket-grid { display: flex; flex-grow: 1; gap: 40px; padding-bottom: 5px; height: 100%; }
+            .col { display: flex; flex-direction: column; flex: 1; position: relative; justify-content: space-around; }
+            .round-title { text-align: center; font-size: 13px; font-weight: bold; text-transform: uppercase; color: #64748b; margin: 0 0 10px 0; letter-spacing: 1px; }
+            
+            .pair { flex: 1; display: flex; flex-direction: column; justify-content: space-around; position: relative; }
+            
+            .match-box { background: #fff; padding: 10px 12px 8px 12px; border: 2px solid #cbd5e1; border-radius: 8px; position: relative; z-index: 2; margin: 5px 0; mt-2; }
+            
+            .time-badge { position: absolute; top: -9px; left: 12px; background: #fff; color: #64748b; font-size: 10px; font-weight: 800; padding: 0 6px; letter-spacing: 0.5px; }
+            
+            .match-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+            
+            .match-id-container { display: flex; flex-direction: row; align-items: baseline; gap: 4px; flex-wrap: wrap; max-width: 70%; }
+            .match-id { font-weight: bold; font-size: 14px; color: #0f172a; white-space: nowrap; }
+            .match-ref { font-size: 11px; font-style: italic; color: #64748b; font-weight: normal; }
+            
+            .match-loc { font-size: 11px; font-weight: bold; text-transform: uppercase; }
+            
+            .team-slot { margin-bottom: 6px; }
+            .team-slot:last-of-type { margin-bottom: 0px; }
+            
+            .team-line-container { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 2px; }
+            .write-line { border-bottom: 2px solid #0f172a; height: 14px; flex-grow: 1; font-size: 14px; font-weight: bold; color: #000; padding-left: 2px; }
+            .score-box { width: 30px; height: 26px; border: 2px solid #94a3b8; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; color: #0f172a; }
+            
+            .team-hint { font-size: 11px; color: #64748b; font-weight: bold; }
+            
+            .connector { position: absolute; right: -20px; top: 25%; bottom: 25%; width: 20px; border: 2px solid #94a3b8; border-left: none; border-radius: 0 8px 8px 0; z-index: 1; }
+            .stem { position: absolute; right: -40px; top: 50%; width: 20px; border-top: 2px solid #94a3b8; z-index: 1; }
+
+            .footer { text-align: center; font-size: 13px; font-style: italic; color: #64748b; margin-top: 5px; font-weight: 600; }
+        </style>
+    </head>
+    <body>
+    `;
+
+    const pA = pools[0]?.id || 'poolA';
+    const pB = pools[1]?.id || 'poolB';
+    const pC = pools[2]?.id || 'poolC';
+    const pD = pools[3]?.id || 'poolD';
+
+    const divisions = ['Gold', 'Silver', 'Bronze'].slice(0, activeDivisions);
+
+    divisions.forEach(div => {
+        let prefix = div === 'Gold' ? 'G' : div === 'Silver' ? 'S' : 'B';
+        let r1 = div === 'Gold' ? 1 : div === 'Silver' ? 3 : 5;
+        let r2 = div === 'Gold' ? 2 : div === 'Silver' ? 4 : 6;
+        
+        let bracketData = [];
+        if (hasSeeding) {
+            bracketData = [
+                { col: 'Seeding Round', rawTime: tSeed1, id: `${prefix}S1`, t1: `seed:${pA}:${r1}`, t2: `seed:${pB}:${r1}`, ref: `seed:${pD}:${r1}` },
+                { col: 'Seeding Round', rawTime: tSeed2, id: `${prefix}S2`, t1: `seed:${pC}:${r1}`, t2: `seed:${pD}:${r1}`, ref: `loser:${prefix}S1` },
+                { col: 'Seeding Round', rawTime: tSeed2, id: `${prefix}S3`, t1: `seed:${pA}:${r2}`, t2: `seed:${pB}:${r2}`, ref: `loser:${prefix}S4` },
+                { col: 'Seeding Round', rawTime: tSeed1, id: `${prefix}S4`, t1: `seed:${pC}:${r2}`, t2: `seed:${pD}:${r2}`, ref: `seed:${pB}:${r2}` },
+                { col: 'Quarterfinals', rawTime: tQf1, id: `${prefix}1`, t1: `winner:${prefix}S1`, t2: `loser:${prefix}S4`, ref: `loser:${prefix}S2` },
+                { col: 'Quarterfinals', rawTime: tQf2, id: `${prefix}2`, t1: `winner:${prefix}S3`, t2: `loser:${prefix}S2`, ref: `loser:${prefix}1` },
+                { col: 'Quarterfinals', rawTime: tQf2, id: `${prefix}3`, t1: `winner:${prefix}S2`, t2: `loser:${prefix}S3`, ref: `loser:${prefix}4` },
+                { col: 'Quarterfinals', rawTime: tQf1, id: `${prefix}4`, t1: `winner:${prefix}S4`, t2: `loser:${prefix}S1`, ref: `loser:${prefix}S3` },
+                { col: 'Semifinals', rawTime: tSf, id: `${prefix}5`, t1: `winner:${prefix}1`, t2: `winner:${prefix}2`, ref: `loser:${prefix}2` },
+                { col: 'Semifinals', rawTime: tSf, id: `${prefix}6`, t1: `winner:${prefix}3`, t2: `winner:${prefix}4`, ref: `loser:${prefix}3` },
+                { col: 'Finals', rawTime: tFinal, id: `${prefix}7`, t1: `winner:${prefix}5`, t2: `winner:${prefix}6`, ref: `loser:${prefix}5` }
+            ];
+        } else {
+             bracketData = [
+                { col: 'Quarterfinals', rawTime: tQf1, id: `${prefix}1`, t1: `seed:${pA}:${r1}`, t2: `seed:${pB}:${r2}`, ref: `seed:${pC}:${r2}` },
+                { col: 'Quarterfinals', rawTime: tQf2, id: `${prefix}2`, t1: `seed:${pD}:${r1}`, t2: `seed:${pC}:${r2}`, ref: `loser:${prefix}1` },
+                { col: 'Quarterfinals', rawTime: tQf2, id: `${prefix}3`, t1: `seed:${pC}:${r1}`, t2: `seed:${pD}:${r2}`, ref: `loser:${prefix}4` },
+                { col: 'Quarterfinals', rawTime: tQf1, id: `${prefix}4`, t1: `seed:${pB}:${r1}`, t2: `seed:${pA}:${r2}`, ref: `seed:${pD}:${r2}` },
+                { col: 'Semifinals', rawTime: tSf, id: `${prefix}5`, t1: `winner:${prefix}1`, t2: `winner:${prefix}2`, ref: `loser:${prefix}2` },
+                { col: 'Semifinals', rawTime: tSf, id: `${prefix}6`, t1: `winner:${prefix}3`, t2: `winner:${prefix}4`, ref: `loser:${prefix}3` },
+                { col: 'Finals', rawTime: tFinal, id: `${prefix}7`, t1: `winner:${prefix}5`, t2: `winner:${prefix}6`, ref: `loser:${prefix}5` }
+            ];
+        }
+
+        const savedScores = tournamentData?.bracket_scores || {};
+        bracketData = bracketData.map(m => {
+            const raw = savedScores[m.id] || {};
+            return {
+                ...m,
+                raw: raw, // Passing raw data to extract scores later
+                site: raw.siteOverride || null,
+                court: raw.courtOverride || null,
+                refOverride: raw.refOverride || null,
+                time: formatDisplayTime(raw.timeOverride || m.rawTime)
+            };
+        });
+
+        const formatTeam = (ref, matchSite) => {
+            if (!ref) return { text: '', travel: '', name: '' };
+            
+            // Check if actual team name exists in database
+            const foundTeam = allTeams.find(t => t.id === ref);
+            const actualName = foundTeam ? foundTeam.name : '';
+
+            if (ref.startsWith('seed:')) {
+                const parts = ref.split(':');
+                const rank = parts[2] == 1 ? '1st' : parts[2] == 2 ? '2nd' : parts[2] == 3 ? '3rd' : '4th';
+                const pName = pools.find(p => p.id === parts[1])?.name || 'Pool';
+                const pSite = pools.find(p => p.id === parts[1])?.site || '';
+                let travel = '';
+                if (pSite && matchSite && pSite !== matchSite) {
+                    travel = `<span style="color: ${getSiteColor(pSite)}; font-weight: bold; margin-left: 4px;">(from ${pSite})</span>`;
+                }
+                return { text: `${rank} ${pName}`, travel, name: actualName };
+            }
+            if (ref.startsWith('winner:')) {
+                const srcMatch = bracketData.find(m => m.id === ref.split(':')[1]);
+                let travel = '';
+                if (srcMatch && srcMatch.site && matchSite && srcMatch.site !== matchSite) {
+                    travel = `<span style="color: ${getSiteColor(srcMatch.site)}; font-weight: bold; margin-left: 4px;">(from ${srcMatch.site})</span>`;
+                }
+                return { text: `Winner Match ${ref.split(':')[1].replace(/^[GSB]/, '')}`, travel, name: actualName };
+            }
+            if (ref.startsWith('loser:')) return { text: `Loser Match ${ref.split(':')[1].replace(/^[GSB]/, '')}`, travel: '', name: actualName };
+            
+            return { text: ref, travel: '', name: actualName };
+        };
+
+        const formatRef = (ref) => {
+             if (!ref) return 'TBD';
+             const foundRef = allTeams.find(t => t.id === ref);
+             if (foundRef) return foundRef.name;
+             
+             if (ref.startsWith('loser:')) {
+                 const matchId = ref.split(':')[1];
+                 const num = matchId.replace(/^[GSB]/, '');
+                 const divPrefix = matchId.charAt(0);
+                 const divName = divPrefix === 'G' ? 'Gold' : divPrefix === 'S' ? 'Silver' : 'Bronze';
+                 return `Loser M${num} (${divName})`;
+             }
+             
+             if (ref.startsWith('seed:')) {
+                 const parts = ref.split(':');
+                 const rank = parts[2] == 1 ? '1st' : parts[2] == 2 ? '2nd' : parts[2] == 3 ? '3rd' : '4th';
+                 const pName = pools.find(p => p.id === parts[1])?.name || 'Pool';
+                 return `${rank} ${pName}`;
+             }
+             
+             if (typeof ref === 'string' && ref.toLowerCase().includes('loser')) {
+                 if (!ref.includes('(')) {
+                     const numMatch = ref.match(/\d+/);
+                     const num = numMatch ? numMatch[0] : '';
+                     let cleanedRef = ref.replace(/of\s+/i, ''); 
+                     return num ? `Loser M${num} (${div})` : `${cleanedRef} (${div})`;
+                 }
+             }
+             
+             return ref;
+        };
+        
+        // Helper to generate populated score boxes for a specific team (A or B)
+        const generateScoreBoxes = (matchRaw, teamLetter) => {
+            let boxes = '';
+            for (let i = 1; i <= bracketSets; i++) {
+                const score = matchRaw[`s${i}${teamLetter}`];
+                boxes += `<div class="score-box">${score !== undefined ? score : ''}</div>`;
+            }
+            return boxes;
+        };
+
+        const renderMatchBox = (m) => {
+            if (!m) return '';
+            const t1 = formatTeam(m.t1, m.site);
+            const t2 = formatTeam(m.t2, m.site);
+            const refStr = formatRef(m.refOverride || m.ref);
+            
+            return `
+            <div class="match-box">
+                <div class="time-badge">${m.time}</div>
+                <div class="match-header">
+                    <div class="match-id-container">
+                        <span class="match-id">Match ${m.id.replace(/^[GSB]/, '')}</span>
+                        <span class="match-ref">(Ref: ${refStr})</span>
+                    </div>
+                    <span class="match-loc" style="color: ${getSiteColor(m.site)};">${m.site || 'Site TBD'}</span>
+                </div>
+                
+                <div class="team-slot">
+                    <div class="team-line-container">
+                        <div class="write-line">${t1.name}</div>
+                        ${generateScoreBoxes(m.raw, 'A')}
+                    </div>
+                    <div class="team-hint">${t1.text} ${t1.travel}</div>
+                </div>
+                
+                <div class="team-slot">
+                    <div class="team-line-container">
+                        <div class="write-line">${t2.name}</div>
+                        ${generateScoreBoxes(m.raw, 'B')}
+                    </div>
+                    <div class="team-hint">${t2.text} ${t2.travel}</div>
+                </div>
+            </div>
+            `;
+        };
+
+        html += `
+        <div class="page">
+            <div class="header">
+                <h1>${tournamentData.name || 'Tournament Name'}</h1>
+                <div class="division-badge">${div} Division</div>
+            </div>
+            <div class="bracket-grid">
+        `;
+
+        const getRound = (col) => bracketData.filter(m => m.col === col);
+
+        if (hasSeeding) {
+            const sMatches = getRound('Seeding Round');
+            html += `<div class="col">
+               <div class="round-title">Seeding Round</div>
+               ${sMatches.map(m => `
+                   <div class="pair" style="justify-content: center;">
+                       ${renderMatchBox(m)}
+                   </div>
+               `).join('')}
+            </div>`;
+        }
+
+        const qf = getRound('Quarterfinals');
+        html += `<div class="col">
+            <div class="round-title">Quarterfinals</div>
+            <div class="pair">
+                ${renderMatchBox(qf[0])}
+                ${renderMatchBox(qf[1])}
+                <div class="connector"></div><div class="stem"></div>
+            </div>
+            <div class="pair">
+                ${renderMatchBox(qf[2])}
+                ${renderMatchBox(qf[3])}
+                <div class="connector"></div><div class="stem"></div>
+            </div>
+        </div>`;
+
+        const sf = getRound('Semifinals');
+        html += `<div class="col">
+            <div class="round-title">Semifinals</div>
+            <div class="pair">
+                ${renderMatchBox(sf[0])}
+                ${renderMatchBox(sf[1])}
+                <div class="connector"></div><div class="stem"></div>
+            </div>
+        </div>`;
+
+        const f = getRound('Finals');
+        html += `<div class="col">
+            <div class="round-title">Championship</div>
+            <div class="pair" style="justify-content: center;">
+                ${renderMatchBox(f[0])}
+            </div>
+        </div>`;
+
+        html += `
+            </div>
+            <div class="footer">* Times are estimates. Matches start when courts clear.</div>
+        </div>
+        `;
+    });
+
+    html += `
+    </body>
+    </html>
+    `;
+
+    printWin.document.write(html);
+    printWin.document.close();
+    
+    setTimeout(() => {
+        printWin.focus();
+        printWin.print();
+    }, 250);
 }

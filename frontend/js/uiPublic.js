@@ -68,15 +68,61 @@ export function renderPublicPools() {
     const container = document.getElementById('publicPoolsList');
     if (!container) return;
 
+    // Fetch Custom Site Configurations
+    const tourneyData = getTournamentData();
+    let config = tourneyData?.bracket_config || {};
+    if (typeof config === 'string') {
+        try { config = JSON.parse(config); } catch(e) {}
+    }
+
+    const filterDropdown = document.getElementById('publicSiteFilter');
+    let selectedSite = 'All';
+
+    // Build and wire up the dropdown dynamically
+    if (filterDropdown) {
+        let optionsHtml = '<option value="All">All Sites</option>';
+        if (config.site1Name) optionsHtml += `<option value="${config.site1Name}">${config.site1Name}</option>`;
+        if (config.site2Name) optionsHtml += `<option value="${config.site2Name}">${config.site2Name}</option>`;
+        if (config.site3Name) optionsHtml += `<option value="${config.site3Name}">${config.site3Name}</option>`;
+
+        // Only update DOM if options changed to prevent resetting user's active selection
+        if (filterDropdown.innerHTML !== optionsHtml) {
+            const currentVal = filterDropdown.value;
+            filterDropdown.innerHTML = optionsHtml;
+            // Restore selection if it exists in the new list, otherwise default to 'All'
+            if (optionsHtml.includes(`value="${currentVal}"`)) {
+                filterDropdown.value = currentVal;
+            } else {
+                filterDropdown.value = 'All';
+            }
+        }
+
+        // Attach listener safely
+        if (!filterDropdown.dataset.listenerAttached) {
+            filterDropdown.addEventListener('change', () => renderPublicPools());
+            filterDropdown.dataset.listenerAttached = 'true';
+        }
+
+        selectedSite = filterDropdown.value;
+    }
+
     const standingsByPool = getAllPoolStandings();
-    const pools = getPools();
+    const allPools = getPools();
     const allMatches = getMatches();
     const allTeams = getTeams();
     
     const teamMap = new Map(allTeams.map(t => [t.id, t]));
 
-    if (pools.length === 0) {
+    if (allPools.length === 0) {
         container.innerHTML = '<p style="color: var(--text-secondary);">No pools have been created yet.</p>';
+        return;
+    }
+
+    // Filter the pools based on the dropdown selection
+    const pools = selectedSite === 'All' ? allPools : allPools.filter(p => p.site === selectedSite);
+
+    if (pools.length === 0) {
+        container.innerHTML = `<p style="color: var(--text-secondary); text-align: center; padding: 20px 0;">No pools are currently scheduled at <strong>${selectedSite}</strong>.</p>`;
         return;
     }
 
@@ -300,11 +346,10 @@ export function renderPublicPools() {
                             const cardShadow = isActive ? '0 4px 15px rgba(0,0,0,0.5)' : 'none';
 
                             return `
-                            <div style="background: ${cardBg}; border-radius: 8px; border: ${cardBorder}; border-left: ${cardLeftBorder}; padding: 10px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; box-shadow: ${cardShadow};">
+                            <div style="background: ${cardBg}; border-radius: 8px; border:${cardBorder}; border-left: ${cardLeftBorder}; padding: 10px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; box-shadow:${cardShadow};">
                                 <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
                                     <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
-                                        ${statusBadge}
-                                        ${refBadge}
+                                        ${statusBadge}${refBadge}
                                     </div>
                                     <div style="text-align: right;">
                                         <div style="color: var(--accent-orange); font-size: 0.75rem; font-weight: bold; white-space: nowrap;">🕒 ${formatTime(m.time)}</div>
@@ -315,13 +360,13 @@ export function renderPublicPools() {
                                     <div style="display: flex; justify-content: space-between; align-items: center;">
                                         <div style="color: ${tAColor}; font-weight: ${tAWeight}; font-size: 0.85rem; flex-grow: 1; padding-right: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${t1Name}</div>
                                         <div style="display: flex; gap: 4px; font-size: 0.8rem; padding-left: 6px; border-left: 1px solid #334155;">
-                                            ${s1A_html} ${s2A_html} ${s3A_html}
+                                            ${s1A_html} ${s2A_html}${s3A_html}
                                         </div>
                                     </div>
                                     <div style="display: flex; justify-content: space-between; align-items: center;">
                                         <div style="color: ${tBColor}; font-weight: ${tBWeight}; font-size: 0.85rem; flex-grow: 1; padding-right: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${t2Name}</div>
                                         <div style="display: flex; gap: 4px; font-size: 0.8rem; padding-left: 6px; border-left: 1px solid #334155;">
-                                            ${s1B_html} ${s2B_html} ${s3B_html}
+                                            ${s1B_html} ${s2B_html}${s3B_html}
                                         </div>
                                     </div>
                                 </div>

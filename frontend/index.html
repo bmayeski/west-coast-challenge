@@ -8,9 +8,13 @@
     <link rel="stylesheet" href="css/style.css">
 
     <style>
-      select option {
+      select option, select optgroup {
         background-color: #1e293b; 
         color: #ffffff; 
+      }
+      select optgroup {
+        color: #94a3b8;
+        font-style: italic;
       }
     </style>
 
@@ -249,149 +253,123 @@
           <div id="adminStandings" class="admin-sub-view" style="display: none;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                   <h2 style="color: var(--text-primary); margin: 0;">Manage Pool Scores</h2>
-                  <button id="refreshScoresBtn" class="btn" style="background: var(--surface-light); color: var(--text-primary); border: 1px solid var(--border-color);">Refresh Matches</button>
+                  
+                  <!-- Wrapped both buttons in a flex container to keep them side-by-side -->
+                  <div style="display: flex; gap: 10px;">
+                      <button id="refreshScoresBtn" class="btn" style="background: var(--surface-light); color: var(--text-primary); border: 1px solid var(--border-color);">Refresh Matches</button>
+                      
+                      <button id="printPoolSheetsBtn" class="btn" style="background: var(--surface-light); color: white; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                          🖨️ Print Pool Sheets
+                      </button>
+                  </div>
               </div>
               <div id="adminScoresGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 15px; align-items: start;"></div>
           </div>
 
           <div id="adminBrackets" class="admin-sub-view" style="display: none;">
-              <div class="data-card" style="padding: 20px; background: var(--surface-dark); margin-bottom: 20px;">
-                  <h3 style="color: var(--accent-orange); margin-top: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
-                      Bracket Configuration
-                  </h3>
+              <div style="background: var(--surface-dark); border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; margin-bottom: 30px;">
+                  <h3 style="color: white; margin-top: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">Tournament Configuration Defaults</h3>
                   
-                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px;">
+                  <!-- Replaced Flex-Wrap with CSS Grid for perfect alignment -->
+                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px; margin-bottom: 25px;">
                       <div>
-                          <label style="display: block; color: var(--text-secondary); margin-bottom: 5px;">Tournament Format</label>
-                          <select id="bracketFormat" style="width: 100%; padding: 10px; background: var(--background-dark); border: 1px solid var(--border-color); color: #FFF; border-radius: 4px; box-sizing: border-box;">
-                              <option value="1day">1-Day (Playoffs immediately follow pool play)</option>
-                              <option value="2day">2-Day (Playoffs on Day 2)</option>
+                          <label style="display: block; color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 5px; text-transform: uppercase; font-weight: bold;">Format</label>
+                          <select id="bracketFormat" style="width: 100%; padding: 10px; background: #0f172a; color: white; border: 1px solid #334155; border-radius: 4px; box-sizing: border-box;">
+                              <option value="1day">1-Day Tournament</option>
+                              <option value="2day">2-Day Tournament</option>
                           </select>
                       </div>
+                      
                       <div>
-                          <label style="display: block; color: var(--text-secondary); margin-bottom: 5px;">Seeding Round (1st vs 1st)</label>
-                          <select id="hasSeedingRounds" style="width: 100%; padding: 10px; background: var(--background-dark); border: 1px solid var(--border-color); color: #FFF; border-radius: 4px; box-sizing: border-box;">
-                              <option value="No">No Seeding Round</option>
-                              <option value="Yes">Yes - Determine Top Seeds</option>
+                          <label style="display: block; color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 5px; text-transform: uppercase; font-weight: bold;">Seeding Round?</label>
+                          <select id="hasSeedingRounds" style="width: 100%; padding: 10px; background: #0f172a; color: white; border: 1px solid #334155; border-radius: 4px; box-sizing: border-box;">
+                              <option value="No">No (Standard Bracket)</option>
+                              <option value="Yes">Yes (Cross-Pool Play-In)</option>
                           </select>
                       </div>
+
                       <div>
-                          <label style="display: block; color: var(--text-secondary); margin-bottom: 5px;">Bracket Start Time</label>
-                          <input type="time" id="bracketStartTime" value="13:00" style="width: 100%; padding: 10px; background: var(--background-dark); border: 1px solid var(--border-color); color: #FFF; border-radius: 4px; box-sizing: border-box;">
-                      </div>
-                      <div>
-                          <label style="display: block; color: var(--text-secondary); margin-bottom: 5px;">Match Time Allotment</label>
-                          <select id="bracketDuration" style="width: 100%; padding: 10px; background: var(--background-dark); border: 1px solid var(--border-color); color: #FFF; border-radius: 4px; box-sizing: border-box;">
-                              <option value="30">30 Minutes</option>
-                              <option value="45">45 Minutes</option>
-                              <option value="60" selected>60 Minutes (Standard)</option>
-                              <option value="90">90 Minutes</option>
+                          <label style="display: block; color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 5px; text-transform: uppercase; font-weight: bold;">Active Divisions</label>
+                          <select id="bracketDivisions" style="width: 100%; padding: 10px; background: #0f172a; color: white; border: 1px solid #334155; border-radius: 4px; box-sizing: border-box;">
+                              <option value="2">Gold & Silver Only</option>
+                              <option value="3">Gold, Silver, & Bronze</option>
                           </select>
+                      </div>
+
+                      <div>
+                          <label style="display: block; color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 5px; text-transform: uppercase; font-weight: bold;">Default Start Time</label>
+                          <input type="time" id="bracketStartTime" value="13:00" style="width: 100%; padding: 10px; background: #0f172a; color: white; border: 1px solid #334155; border-radius: 4px; box-sizing: border-box;">
+                      </div>
+
+                      <div>
+                          <label style="display: block; color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 5px; text-transform: uppercase; font-weight: bold;">Pool Match (Mins)</label>
+                          <input type="number" id="poolDuration" value="60" style="width: 100%; padding: 10px; background: #0f172a; color: white; border: 1px solid #334155; border-radius: 4px; box-sizing: border-box;">
+                      </div>
+
+                      <div>
+                          <label style="display: block; color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 5px; text-transform: uppercase; font-weight: bold;">Bracket Match (Mins)</label>
+                          <input type="number" id="bracketDuration" value="60" style="width: 100%; padding: 10px; background: #0f172a; color: white; border: 1px solid #334155; border-radius: 4px; box-sizing: border-box;">
                       </div>
                   </div>
 
-                  <h4 style="color: var(--text-primary); margin-top: 20px; margin-bottom: 10px;">Bracket Host Locations</h4>
-                  <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 15px;">Set the playing site for each division (updates the public dropdown).</p>
-                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px;">
-                      <div>
-                          <label style="display: block; color: var(--text-secondary); margin-bottom: 5px;">Gold Bracket Site</label>
-                          <input type="text" id="locGold" placeholder="e.g., Main Gym" style="width: 100%; padding: 10px; background: var(--background-dark); border: 1px solid var(--border-color); color: #FFF; border-radius: 4px; box-sizing: border-box;">
-                      </div>
-                      <div>
-                          <label style="display: block; color: var(--text-secondary); margin-bottom: 5px;">Silver Bracket Site</label>
-                          <input type="text" id="locSilver" placeholder="e.g., Aux Gym" style="width: 100%; padding: 10px; background: var(--background-dark); border: 1px solid var(--border-color); color: #FFF; border-radius: 4px; box-sizing: border-box;">
-                      </div>
-                      <div>
-                          <label style="display: block; color: var(--text-secondary); margin-bottom: 5px;">Bronze Bracket Site</label>
-                          <input type="text" id="locBronze" placeholder="Optional" style="width: 100%; padding: 10px; background: var(--background-dark); border: 1px solid var(--border-color); color: #FFF; border-radius: 4px; box-sizing: border-box;">
-                      </div>
-                  </div>
-
-                  <h4 style="color: var(--text-primary); margin-top: 20px; margin-bottom: 10px;">First-Round Ref Assignments</h4>
-                  <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 15px;">Assign which pool seeds referee the first matches on Court 1 and Court 2.</p>
-                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px;">
-                      <div>
-                          <label style="display: block; color: var(--text-secondary); margin-bottom: 5px;">Match 1 Ref (Court 1)</label>
-                          <select id="refMatch1" style="width: 100%; padding: 10px; background: var(--background-dark); border: 1px solid var(--border-color); color: #FFF; border-radius: 4px; box-sizing: border-box;">
-                              <option value="pA:r1">Pool A (Top Seed)</option>
-                              <option value="pA:r2">Pool A (Lower Seed)</option>
-                              <option value="pB:r1">Pool B (Top Seed)</option>
-                              <option value="pB:r2">Pool B (Lower Seed)</option>
-                              <option value="pC:r1">Pool C (Top Seed)</option>
-                              <option value="pC:r2" selected>Pool C (Lower Seed)</option>
-                              <option value="pD:r1">Pool D (Top Seed)</option>
-                              <option value="pD:r2">Pool D (Lower Seed)</option>
-                          </select>
-                      </div>
-                      <div>
-                          <label style="display: block; color: var(--text-secondary); margin-bottom: 5px;">Match 2 Ref (Court 2)</label>
-                          <select id="refMatch2" style="width: 100%; padding: 10px; background: var(--background-dark); border: 1px solid var(--border-color); color: #FFF; border-radius: 4px; box-sizing: border-box;">
-                              <option value="pA:r1">Pool A (Top Seed)</option>
-                              <option value="pA:r2">Pool A (Lower Seed)</option>
-                              <option value="pB:r1">Pool B (Top Seed)</option>
-                              <option value="pB:r2" selected>Pool B (Lower Seed)</option>
-                              <option value="pC:r1">Pool C (Top Seed)</option>
-                              <option value="pC:r2">Pool C (Lower Seed)</option>
-                              <option value="pD:r1">Pool D (Top Seed)</option>
-                              <option value="pD:r2">Pool D (Lower Seed)</option>
-                          </select>
-                      </div>
-                  </div>
-
-                  <h4 style="color: var(--text-primary); margin-top: 20px; margin-bottom: 10px;">Division Advancement Routing</h4>
-                  <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 15px;">Define where teams advance based on their final pool standings.</p>
+                  <h4 style="color: var(--text-primary); margin-top: 25px; margin-bottom: 10px; border-bottom: 1px solid #334155; padding-bottom: 5px;">Tournament Sites & Colors</h4>
                   
-                  <div style="display: flex; flex-direction: column; gap: 10px;">
-                      <div style="display: flex; gap: 10px; align-items: center;">
-                          <span style="color: white; width: 60px;">1st Place:</span>
-                          <select class="routing-select" data-rank="1" style="flex-grow: 1; padding: 8px; background: var(--background-dark); border: 1px solid var(--border-color); color: #FFF; border-radius: 4px; box-sizing: border-box;">
-                              <option value="gold">Gold Bracket</option>
-                              <option value="silver">Silver Bracket</option>
-                              <option value="bronze">Bronze Bracket</option>
-                              <option value="eliminated">Eliminated</option>
-                          </select>
+                  <!-- Grid layout for sites as well -->
+                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 15px;">
+                      <div style="display: flex; gap: 10px; align-items: center; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 4px; border: 1px solid #334155; box-sizing: border-box;">
+                          <div style="display: flex; flex-direction: column; gap: 5px;">
+                              <input type="color" id="site1Color" value="#3b82f6" style="width: 45px; height: 30px; border: none; background: transparent; cursor: pointer;" oninput="document.getElementById('site1Hex').value = this.value">
+                              <input type="text" id="site1Hex" value="#3b82f6" style="width: 55px; padding: 2px; background: #0f172a; border: 1px solid #334155; color: white; font-size: 0.65rem; border-radius: 2px; text-transform: uppercase; text-align: center;" oninput="if(this.value.length === 7 && this.value.startsWith('#')) document.getElementById('site1Color').value = this.value">
+                          </div>
+                          <div style="flex-grow: 1;">
+                              <label style="display: block; color: var(--text-secondary); font-size: 0.7rem; margin-bottom: 3px; text-transform: uppercase;">Primary Site</label>
+                              <input type="text" id="site1Name" placeholder="e.g., Main Gym" style="width: 100%; padding: 8px; background: #0f172a; border: 1px solid #334155; color: white; border-radius: 4px; box-sizing: border-box;">
+                          </div>
                       </div>
-                      <div style="display: flex; gap: 10px; align-items: center;">
-                          <span style="color: white; width: 60px;">2nd Place:</span>
-                          <select class="routing-select" data-rank="2" style="flex-grow: 1; padding: 8px; background: var(--background-dark); border: 1px solid var(--border-color); color: #FFF; border-radius: 4px; box-sizing: border-box;">
-                              <option value="gold">Gold Bracket</option>
-                              <option value="silver">Silver Bracket</option>
-                              <option value="bronze">Bronze Bracket</option>
-                              <option value="eliminated">Eliminated</option>
-                          </select>
+                      <div style="display: flex; gap: 10px; align-items: center; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 4px; border: 1px solid #334155; box-sizing: border-box;">
+                          <div style="display: flex; flex-direction: column; gap: 5px;">
+                              <input type="color" id="site2Color" value="#ef4444" style="width: 45px; height: 30px; border: none; background: transparent; cursor: pointer;" oninput="document.getElementById('site2Hex').value = this.value">
+                              <input type="text" id="site2Hex" value="#ef4444" style="width: 55px; padding: 2px; background: #0f172a; border: 1px solid #334155; color: white; font-size: 0.65rem; border-radius: 2px; text-transform: uppercase; text-align: center;" oninput="if(this.value.length === 7 && this.value.startsWith('#')) document.getElementById('site2Color').value = this.value">
+                          </div>
+                          <div style="flex-grow: 1;">
+                              <label style="display: block; color: var(--text-secondary); font-size: 0.7rem; margin-bottom: 3px; text-transform: uppercase;">Secondary Site</label>
+                              <input type="text" id="site2Name" placeholder="e.g., Aux Gym" style="width: 100%; padding: 8px; background: #0f172a; border: 1px solid #334155; color: white; border-radius: 4px; box-sizing: border-box;">
+                          </div>
                       </div>
-                      <div style="display: flex; gap: 10px; align-items: center;">
-                          <span style="color: white; width: 60px;">3rd Place:</span>
-                          <select class="routing-select" data-rank="3" style="flex-grow: 1; padding: 8px; background: var(--background-dark); border: 1px solid var(--border-color); color: #FFF; border-radius: 4px; box-sizing: border-box;">
-                              <option value="silver" selected>Silver Bracket</option>
-                              <option value="gold">Gold Bracket</option>
-                              <option value="bronze">Bronze Bracket</option>
-                              <option value="eliminated">Eliminated</option>
-                          </select>
-                      </div>
-                      <div style="display: flex; gap: 10px; align-items: center;">
-                          <span style="color: white; width: 60px;">4th Place:</span>
-                          <select class="routing-select" data-rank="4" style="flex-grow: 1; padding: 8px; background: var(--background-dark); border: 1px solid var(--border-color); color: #FFF; border-radius: 4px; box-sizing: border-box;">
-                              <option value="silver" selected>Silver Bracket</option>
-                              <option value="bronze">Bronze Bracket</option>
-                              <option value="eliminated">Eliminated</option>
-                          </select>
+                      <div style="display: flex; gap: 10px; align-items: center; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 4px; border: 1px solid #334155; box-sizing: border-box;">
+                          <div style="display: flex; flex-direction: column; gap: 5px;">
+                              <input type="color" id="site3Color" value="#22c55e" style="width: 45px; height: 30px; border: none; background: transparent; cursor: pointer;" oninput="document.getElementById('site3Hex').value = this.value">
+                              <input type="text" id="site3Hex" value="#22c55e" style="width: 55px; padding: 2px; background: #0f172a; border: 1px solid #334155; color: white; font-size: 0.65rem; border-radius: 2px; text-transform: uppercase; text-align: center;" oninput="if(this.value.length === 7 && this.value.startsWith('#')) document.getElementById('site3Color').value = this.value">
+                          </div>
+                          <div style="flex-grow: 1;">
+                              <label style="display: block; color: var(--text-secondary); font-size: 0.7rem; margin-bottom: 3px; text-transform: uppercase;">Tertiary Site</label>
+                              <input type="text" id="site3Name" placeholder="Optional" style="width: 100%; padding: 8px; background: #0f172a; border: 1px solid #334155; color: white; border-radius: 4px; box-sizing: border-box;">
+                          </div>
                       </div>
                   </div>
-
-                  <button id="saveBracketConfigBtn" class="btn btn-primary" style="margin-top: 20px; width: 100%; transition: background-color 0.3s ease;">💾 Save Configuration</button>
+                  
+                  <button id="saveBracketConfigBtn" style="margin-top: 20px; padding: 10px 20px; background: var(--accent-orange); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Save Defaults</button>
               </div>
           </div>
 
           <div id="adminBracketScores" class="admin-sub-view" style="display: none;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                   <h2 style="color: var(--accent-orange); margin: 0;">Edit Bracket Scores</h2>
-                  <select id="adminBracketDivisionSelect" style="padding: 8px 12px; border-radius: 4px; background: var(--surface-light); color: white; border: 1px solid var(--border-color); font-size: 0.9rem;">
+                  
+                  <!-- Wrapped the select and button in a flex container -->
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                      <select id="adminBracketDivisionSelect" style="padding: 8px 12px; border-radius: 4px; background: var(--surface-light); color: white; border: 1px solid var(--border-color); font-size: 0.9rem;">
                       </select>
+                      
+                      <!-- NEW PRINT BUTTON -->
+                      <button id="printBracketsBtn" class="btn" style="background: var(--surface-light); color: white; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 6px 12px; border-radius: 4px; font-weight: bold;">
+                          🖨️ Print Brackets
+                      </button>
+                  </div>
               </div>
               
               <div id="adminBracketCanvas" style="background: var(--surface-dark); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; overflow-x: auto; min-height: 350px;">
-                  </div>
+              </div>
           </div>
 
       </div>
@@ -486,6 +464,7 @@
       </div>
     </div>
 
+    <!-- Edit Bracket Score Modal -->
     <div id="editBracketScoreModal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); z-index: 9999; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
       <div class="modal-card" style="max-width: 400px; text-align: center; width: 100%; background: var(--surface-dark); padding: 25px; border-radius: 8px; border: 1px solid var(--border-color);">
         <h3 style="margin-top: 0; color: var(--text-primary); margin-bottom: 5px;">Edit Bracket Match Scores</h3>
@@ -523,6 +502,50 @@
               <button class="btn" id="closeBracketScoreModalBtn" style="background: transparent; color: var(--text-secondary); border: 1px solid var(--border-color); border-radius: 4px; padding: 8px 12px;">Cancel</button>
               <button class="btn" id="saveBracketScoresBtn" style="background: var(--accent-orange); color: white; border: none; font-weight: bold; border-radius: 4px; padding: 8px 12px;">Save Scores</button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Bracket Details Modal -->
+    <div id="editBracketDetailsModal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); z-index: 9999; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+      <div class="modal-card" style="max-width: 400px; text-align: left; width: 100%; background: var(--surface-dark); padding: 25px; border-radius: 8px; border: 1px solid var(--border-color);">
+        <h3 style="margin-top: 0; color: var(--text-primary); margin-bottom: 5px; text-align: center;">Edit Match Details</h3>
+        <p id="bracketDetailsModalMatchup" style="color: var(--accent-orange); font-size: 0.95rem; font-weight: bold; margin-bottom: 20px; text-align: center;">Team A vs Team B</p>
+        
+        <input type="hidden" id="detailsMatchId">
+        
+        <div style="display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px;">
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-secondary); display: block; margin-bottom: 5px;">Time</label>
+            <input type="time" id="detailsTime" style="width: 100%; padding: 10px; background: var(--background-dark); border: 1px solid var(--border-color); color: #FFF; border-radius: 4px; box-sizing: border-box;">
+          </div>
+          <div style="display: flex; gap: 10px;">
+              <div style="flex: 1;">
+                <label style="font-size: 0.8rem; color: var(--text-secondary); display: block; margin-bottom: 5px;">Site / Location</label>
+                <select id="detailsSite" style="width: 100%; padding: 10px; background: var(--background-dark); border: 1px solid var(--border-color); color: #FFF; border-radius: 4px; box-sizing: border-box;">
+                    <option value="">-- Select Site --</option>
+                </select>
+              </div>
+              <div style="flex: 1;">
+                <label style="font-size: 0.8rem; color: var(--text-secondary); display: block; margin-bottom: 5px;">Court</label>
+                <select id="detailsCourt" style="width: 100%; padding: 10px; background: var(--background-dark); border: 1px solid var(--border-color); color: #FFF; border-radius: 4px; box-sizing: border-box;">
+                    <option value="">-- Select Court --</option>
+                    <option value="1">Court 1</option>
+                    <option value="2">Court 2</option>
+                    <option value="3">Court 3</option>
+                </select>
+              </div>
+          </div>
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-secondary); display: block; margin-bottom: 5px;">Referee Override</label>
+            <select id="detailsRef" style="width: 100%; padding: 10px; background: var(--background-dark); border: 1px solid var(--border-color); color: #FFF; border-radius: 4px; box-sizing: border-box;">
+            </select>
+          </div>
+        </div>
+        
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button class="btn" id="closeBracketDetailsModalBtn" style="background: transparent; color: var(--text-secondary); border: 1px solid var(--border-color); border-radius: 4px; padding: 8px 12px;">Cancel</button>
+          <button class="btn" id="saveBracketDetailsBtn" style="background: var(--accent-orange); color: white; border: none; font-weight: bold; border-radius: 4px; padding: 8px 12px;">Save Details</button>
         </div>
       </div>
     </div>

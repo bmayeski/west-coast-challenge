@@ -517,6 +517,15 @@ input[type="time"] {
     outline: none;
 }
 
+select option, select optgroup {
+  background-color: #1e293b; 
+  color: #ffffff; 
+}
+select optgroup {
+  color: #94a3b8;
+  font-style: italic;
+}
+
 /* Add a subtle glow when clicking on the dropdowns/inputs */
 select:focus, 
 input[type="time"]:focus {
@@ -560,4 +569,8 @@ input[type="time"]:focus {
 .match-row input {
     padding: 4px 8px !important;
     font-size: 0.85rem;
+}
+
+html {
+    scrollbar-gutter: stable;
 }
