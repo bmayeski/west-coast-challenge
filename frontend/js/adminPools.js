@@ -71,8 +71,21 @@ function renderPoolAssignmentGrid() {
         const poolDiv = document.createElement('div');
         poolDiv.className = 'data-card';
         poolDiv.style.cssText = 'padding: 15px; background: var(--surface-dark);';
+        
+        const safePoolName = (pool.name || '').replace(/'/g, "\\'");
+        const safePoolSite = (pool.site || '').replace(/'/g, "\\'");
+
         poolDiv.innerHTML = `
-            <h4 style="margin-top: 0; color: var(--accent-orange);">${pool.name}</h4>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid var(--border-color); padding-bottom: 5px;">
+                <div>
+                    <h4 style="margin: 0; color: var(--accent-orange);">${pool.name}</h4>
+                    <span style="font-size: 0.75rem; color: var(--text-secondary);">📍 ${pool.site || 'No Site Set'}</span>
+                </div>
+                <div style="display: flex; gap: 6px;">
+                    <button onclick="openEditPoolModal('${pool.id}', '${safePoolName}', '${safePoolSite}')" style="background: none; border: none; color: var(--accent-orange); cursor: pointer; font-size: 0.8rem;" title="Edit Pool">✏️</button>
+                    <button onclick="deletePool('${pool.id}')" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 0.8rem;" title="Delete Pool">🗑️</button>
+                </div>
+            </div>
             <div id="pool-${pool.id}" class="pool-list" data-pool-id="${pool.id}" style="min-height: 100px; display: flex; flex-direction: column; gap: 8px;"></div>
         `;
         grid.appendChild(poolDiv);
@@ -82,14 +95,11 @@ function renderPoolAssignmentGrid() {
     teams.forEach(team => {
         const teamEl = document.createElement('div');
         teamEl.className = 'team-card cursor-grab';
-        // Updated styling to space items between left (name) and right (buttons)
         teamEl.style.cssText = 'padding: 10px; background: var(--surface-light); border: 1px solid var(--border-color); border-radius: 4px; display: flex; justify-content: space-between; align-items: center;';
         teamEl.dataset.id = team.id;
 
-        // Escape single quotes in names so it doesn't break the javascript onclick function
         const safeName = team.name.replace(/'/g, "\\'");
         
-        // Use the logo if available, otherwise fallback to the color square
         const logoHtml = team.logo_id 
             ? `<img src="${team.logo_id}" style="width: 20px; height: 20px; border-radius: 4px; object-fit: contain; flex-shrink: 0;">` 
             : `<div style="width: 20px; height: 20px; border-radius: 4px; background: ${team.color || '#3b82f6'}; flex-shrink: 0;"></div>`;
@@ -110,12 +120,11 @@ function renderPoolAssignmentGrid() {
             </div>
         `;
 
-        // Uses the correct pool_id from your database schema
         const targetContainer = team.pool_id ? document.getElementById(`pool-${team.pool_id}`) : document.getElementById('pool-unassigned');
         if (targetContainer) targetContainer.appendChild(teamEl);
     });
 
-    // 4. Hook up SortableJS to all generated lists
+    // 4. Hook up SortableJS
     document.querySelectorAll('.pool-list').forEach(container => {
         new Sortable(container, {
             group: 'shared',
@@ -138,31 +147,22 @@ async function handleAddTeam() {
     let logoUrl = null;
     const file = logoInput.files[0];
 
-    // 1. Upload to Supabase Storage if a file was selected
     if (file) {
         const fileExt = file.name.split('.').pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-        const filePath = `${tournamentId}/${fileName}`; // Groups images by tournament
+        const filePath = `${tournamentId}/${fileName}`;
 
-        // Change 'logos' if your Supabase bucket has a different name!
-        const { error: uploadError } = await supabase.storage
-            .from('logos') 
-            .upload(filePath, file);
+        const { error: uploadError } = await supabase.storage.from('logos').upload(filePath, file);
 
         if (uploadError) {
             alert("Error uploading logo: " + uploadError.message);
             return; 
         }
 
-        // Generate the public URL to save in the database
-        const { data: publicUrlData } = supabase.storage
-            .from('logos')
-            .getPublicUrl(filePath);
-            
+        const { data: publicUrlData } = supabase.storage.from('logos').getPublicUrl(filePath);
         logoUrl = publicUrlData.publicUrl;
     }
 
-    // 2. Save the team to the database with the new URL
     const { error } = await supabase
         .from('teams')
         .insert([{ 
@@ -176,7 +176,6 @@ async function handleAddTeam() {
     if (error) {
         alert("Error adding team: " + error.message);
     } else {
-        // Reset form
         teamInput.value = '';
         colorInput.value = '#3b82f6';
         logoInput.value = '';
@@ -228,7 +227,6 @@ async function savePoolAssignments() {
 
     if (updates.length === 0) return;
 
-    // Send the updates concurrently to Supabase
     const promises = updates.map(update => 
         supabase.from('teams').update({ pool_id: update.pool_id, seed: update.seed }).eq('id', update.id)
     );
@@ -244,9 +242,31 @@ async function savePoolAssignments() {
     }
 }
 
-// --- EDIT TEAM & DELETE TEAM GLOBAL FUNCTIONS ---
+// --- GLOBAL POOL FUNCTIONS ---
 
-// 1. Opens the modal and populates current data
+window.openEditPoolModal = (id, name, site) => {
+    document.getElementById('editPoolId').value = id;
+    document.getElementById('editPoolName').value = name;
+    document.getElementById('editPoolSite').value = site !== 'null' && site !== 'undefined' ? site : '';
+    document.getElementById('editPoolModal').style.display = 'flex';
+};
+
+window.deletePool = async (id) => {
+    if (!confirm("Are you sure you want to delete this pool? Teams inside this pool will be moved to Unassigned.")) {
+        return;
+    }
+    
+    const { error } = await supabase.from('pools').delete().eq('id', id);
+        
+    if (error) {
+        alert("Error deleting pool: " + error.message);
+    } else {
+        loadTeams();
+    }
+};
+
+// --- GLOBAL TEAM FUNCTIONS ---
+
 window.openEditTeamModal = (id, name, color, logoUrl) => {
     document.getElementById('editTeamId').value = id;
     document.getElementById('editTeamName').value = name;
@@ -265,28 +285,22 @@ window.openEditTeamModal = (id, name, color, logoUrl) => {
     document.getElementById('editTeamModal').style.display = 'flex';
 };
 
-// 2. Delete team function
 window.deleteTeam = async (id) => {
-    // Prevent accidental clicks
     if (!confirm("Are you sure you want to delete this team? If they are already scheduled in matches, it may cause empty slots.")) {
         return;
     }
     
-    const { error } = await supabase
-        .from('teams')
-        .delete()
-        .eq('id', id);
+    const { error } = await supabase.from('teams').delete().eq('id', id);
         
     if (error) {
         alert("Error deleting team: " + error.message);
     } else {
-        loadTeams(); // Instantly refresh the UI
+        loadTeams();
     }
 };
 
-// --- GLOBAL EVENT LISTENERS (Bulletproof Event Delegation) ---
+// --- GLOBAL EVENT LISTENERS ---
 
-// Handle image preview painting for both Add and Edit inputs
 document.addEventListener('change', function(e) {
     if (e.target && e.target.id === 'newTeamLogo') {
         const file = e.target.files[0];
@@ -311,15 +325,41 @@ document.addEventListener('change', function(e) {
     }
 });
 
-// Handle Modal Save and Cancel buttons
 document.addEventListener('click', async (e) => {
-    // Close Modal
+    // Close Team Modal
     if (e.target && e.target.id === 'cancelEditTeamBtn') {
         const modal = document.getElementById('editTeamModal');
         if (modal) modal.style.display = 'none';
     }
 
-    // Save Changes
+    // Close Pool Modal
+    if (e.target && e.target.id === 'cancelEditPoolBtn') {
+        const modal = document.getElementById('editPoolModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    // Save Pool Changes
+    if (e.target && e.target.id === 'saveEditPoolBtn') {
+        const id = document.getElementById('editPoolId').value;
+        const name = document.getElementById('editPoolName').value.trim();
+        const site = document.getElementById('editPoolSite').value.trim();
+        const saveBtn = e.target;
+
+        if (!name) return alert("Pool name is required.");
+        saveBtn.innerText = 'Saving...';
+
+        const { error } = await supabase.from('pools').update({ name, site }).eq('id', id);
+
+        if (error) {
+            alert("Error updating pool: " + error.message);
+        } else {
+            document.getElementById('editPoolModal').style.display = 'none';
+            loadTeams();
+        }
+        saveBtn.innerText = 'Save Changes';
+    }
+
+    // Save Team Changes
     if (e.target && e.target.id === 'saveEditTeamBtn') {
         const id = document.getElementById('editTeamId').value;
         const name = document.getElementById('editTeamName').value.trim();
@@ -334,7 +374,6 @@ document.addEventListener('click', async (e) => {
         const updatePayload = { name, color };
         const file = fileInput.files[0];
 
-        // If a new logo was uploaded, process it first
         if (file) {
             const fileExt = file.name.split('.').pop();
             const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
@@ -357,7 +396,7 @@ document.addEventListener('click', async (e) => {
             alert("Error updating team: " + error.message);
         } else {
             document.getElementById('editTeamModal').style.display = 'none';
-            loadTeams(); // Refresh the list
+            loadTeams();
         }
         
         saveBtn.innerText = 'Save Changes';

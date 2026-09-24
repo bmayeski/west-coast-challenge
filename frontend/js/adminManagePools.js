@@ -14,14 +14,52 @@ export function initManagePools() {
     if (closeBtn) closeBtn.addEventListener('click', closeScoreModal);
     if (saveBtn) saveBtn.addEventListener('click', handleSaveScores);
 
-    const grid = document.getElementById('adminScoresGrid');
-    if (grid) {
-        grid.addEventListener('click', (e) => {
-            if (e.target.classList.contains('edit-score-admin-btn')) {
-                openScoreModal(e.target.dataset.matchId);
-            }
-        });
-    }
+    // Consolidated Event Delegation for the entire Manage Pools view
+    document.addEventListener('click', (e) => {
+        // 1. Open Score Modal
+        if (e.target.classList.contains('edit-score-admin-btn')) {
+            openScoreModal(e.target.dataset.matchId);
+        }
+        
+        // 2. Open Pool Details Modal (The new ⚙️ button)
+        if (e.target.closest('.edit-pool-details-btn')) {
+            const btn = e.target.closest('.edit-pool-details-btn');
+            document.getElementById('poolDetailsMatchId').value = btn.dataset.matchId;
+            document.getElementById('poolDetailsModalMatchup').innerText = `${btn.dataset.t1} vs ${btn.dataset.t2}`;
+            
+            document.getElementById('poolDetailsTime').value = btn.dataset.time || '';
+            document.getElementById('poolDetailsCourt').value = btn.dataset.court || '';
+            
+            const allTeams = getTeams();
+            const sortedTeams = [...allTeams].sort((a, b) => a.name.localeCompare(b.name));
+            
+            let refOpts = '<option value="">-- Select Referee --</option>';
+            sortedTeams.forEach(t => {
+                const isSelected = btn.dataset.ref === t.id ? 'selected' : '';
+                refOpts += `<option value="${t.id}" ${isSelected}>${t.name}</option>`;
+            });
+            document.getElementById('poolDetailsRef').innerHTML = refOpts;
+            
+            const modal = document.getElementById('editPoolDetailsModal');
+            if (modal) modal.style.display = 'flex';
+        }
+
+        // 3. Close Pool Details Modal
+        if (e.target.closest('#closePoolDetailsModalBtn')) {
+            const modal = document.getElementById('editPoolDetailsModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        // 4. Save Pool Details
+        if (e.target.closest('#savePoolDetailsBtn')) {
+            handleSavePoolDetails(e.target.closest('#savePoolDetailsBtn'));
+        }
+
+        // 5. Print Pool Sheets
+        if (e.target.id === 'printPoolSheetsBtn') {
+            printPoolSheets();
+        }
+    });
 }
 
 export async function loadPoolScores() {
@@ -57,7 +95,7 @@ function getOrdinalSuffix(i) {
     return i + "th";
 }
 
-function renderAdminPools() {
+export function renderAdminPools() {
     const container = document.getElementById('adminScoresGrid');
     if (!container) return;
 
@@ -254,13 +292,23 @@ function renderAdminPools() {
                                     </div>
                                 </div>
                                 
-                                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0;">
-                                    <div style="display: flex; gap: 6px; text-align: center; font-size: 0.75rem; color: var(--text-secondary);">
+                                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; min-width: 110px;">
+                                    <div style="display: flex; gap: 6px; text-align: center; font-size: 0.75rem; color: var(--text-secondary); justify-content: flex-end; width: 100%;">
                                         <div style="width: 34px; background: rgba(0,0,0,0.2); border-radius: 3px; padding: 2px 0;">${s1a}-${s1b}</div>
                                         <div style="width: 34px; background: rgba(0,0,0,0.2); border-radius: 3px; padding: 2px 0;">${s2a}-${s2b}</div>
                                         <div style="width: 34px; background: rgba(0,0,0,0.2); border-radius: 3px; padding: 2px 0;">${s3a}-${s3b}</div>
                                     </div>
-                                    <button class="btn edit-score-admin-btn" data-match-id="${m.id}" style="font-size: 0.65rem; padding: 3px 12px; background: var(--surface-light); border: 1px solid var(--border-color); color: white; cursor: pointer; border-radius: 4px; width: 100%;">Edit Scores</button>
+                                    <div style="display: flex; gap: 4px; width: 100%;">
+                                        <button class="btn edit-pool-details-btn" 
+                                            data-match-id="${m.id}" 
+                                            data-t1="${t1Name}" 
+                                            data-t2="${t2Name}" 
+                                            data-time="${m.time ? m.time : ''}" 
+                                            data-court="${m.court ? m.court : ''}" 
+                                            data-ref="${m.ref ? m.ref : ''}" 
+                                            style="font-size: 0.9rem; padding: 3px 8px; background: var(--surface-light); border: 1px solid var(--border-color); color: white; cursor: pointer; border-radius: 4px; display: flex; align-items: center; justify-content: center;" title="Edit Match Details">⚙️</button>
+                                        <button class="btn edit-score-admin-btn" data-match-id="${m.id}" style="font-size: 0.65rem; padding: 3px; background: var(--surface-light); border: 1px solid var(--border-color); color: white; cursor: pointer; border-radius: 4px; flex-grow: 1;">Edit Scores</button>
+                                    </div>
                                 </div>
                             </div>
                             `;
@@ -337,6 +385,36 @@ async function handleSaveScores() {
         closeScoreModal();
         loadPoolScores(); 
     }
+}
+
+async function handleSavePoolDetails(btn) {
+    const originalText = btn.innerText;
+    btn.innerText = 'Saving...';
+    
+    const matchId = document.getElementById('poolDetailsMatchId').value;
+    const time = document.getElementById('poolDetailsTime').value;
+    const court = document.getElementById('poolDetailsCourt').value;
+    const ref = document.getElementById('poolDetailsRef').value;
+    
+    const { error } = await supabase
+        .from('matches')
+        .update({ time, court, ref })
+        .eq('id', matchId);
+        
+    if (error) {
+        alert("Error saving details: " + error.message);
+    } else {
+        const allMatches = getMatches();
+        const m = allMatches.find(m => m.id === matchId);
+        if (m) {
+            m.time = time;
+            m.court = court;
+            m.ref = ref;
+        }
+        document.getElementById('editPoolDetailsModal').style.display = 'none';
+        renderAdminPools();
+    }
+    btn.innerText = originalText;
 }
 
 export function printPoolSheets() {
@@ -659,10 +737,3 @@ export function printPoolSheets() {
         printWin.print();
     }, 250);
 }
-
-// Finally, wire up the event listener somewhere inside your initManagePools() function:
-document.addEventListener('click', (e) => {
-    if (e.target.id === 'printPoolSheetsBtn') {
-        printPoolSheets();
-    }
-});

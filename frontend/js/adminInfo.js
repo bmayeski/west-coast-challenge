@@ -218,6 +218,20 @@ export function printQRFlyer() {
     // Use the slug for the URL, falling back to ID if a slug isn't set
     const tournamentSlug = tournamentData.slug || tournamentId;
     
+    // Dynamically check how many divisions are active
+    let config = tournamentData?.bracket_config || {};
+    if (typeof config === 'string') {
+        try { config = JSON.parse(config); } catch(e) {}
+    }
+    const activeDivisions = parseInt(config.divisions || '2', 10);
+    
+    let divisionsText = "Gold and Silver divisions";
+    if (activeDivisions === 3) {
+        divisionsText = "Gold, Silver, and Bronze divisions";
+    } else if (activeDivisions === 1) {
+        divisionsText = "Gold division";
+    }
+    
     // Construct the live site URL and safely encode it for the API
     const siteUrl = `https://sports-ski-matics.vercel.app/?t=${tournamentSlug}`;
     const encodedUrl = encodeURIComponent(siteUrl);
@@ -344,7 +358,7 @@ export function printQRFlyer() {
                 </div>
                 <div class="feature-card">
                     <div class="feature-title">🏆 Live Brackets</div>
-                    <p class="feature-desc">Follow teams as they advance through the Gold, Silver, and Bronze divisions.</p>
+                    <p class="feature-desc">Follow teams as they advance through the ${divisionsText}.</p>
                 </div>
                 <div class="feature-card">
                     <div class="feature-title">🏐 Match Scores</div>

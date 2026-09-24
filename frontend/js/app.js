@@ -1,7 +1,7 @@
 // app.js
 import { supabase } from './supabaseClient.js';
 import { getTournamentId, setTournamentId, setTournamentData, setCurrentView } from './state.js';
-import { initAuth } from './adminAuth.js';
+import { initAuth, applyGameDayLockdown, initHiddenSuperAdmin } from './adminAuth.js';
 import { initPools, loadTeams } from './adminPools.js';
 import { initSchedule, loadSchedule } from './adminSchedule.js';
 import { initEditor, loadTournamentInfo } from './adminInfo.js';
@@ -73,26 +73,72 @@ export async function loadTournamentDirectory() {
             return;
         }
 
+        container.style.display = 'block';
         container.innerHTML = '';
-        tournaments.forEach(t => {
-            const card = document.createElement('a');
-            card.href = `?t=${encodeURIComponent(t.slug)}`; 
-            card.className = 'tournament-card';
-            card.style.cssText = 'display: block; background: var(--surface-dark); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; text-decoration: none; color: inherit; min-width: 250px;';
-            
-            let displayStatus = t.status === 'published' ? 'Upcoming' : t.status;
-            displayStatus = displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1);
 
-            card.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <span style="font-size: 0.75rem; padding: 3px 8px; border-radius: 12px; background: ${t.status === 'active' ? 'var(--accent-orange)' : 'rgba(255,255,255,0.1)'}; color: white; font-weight: bold;">${displayStatus}</span>
-                </div>
-                <h4 style="margin: 0 0 10px 0; color: var(--text-primary); font-size: 1.1rem;">${t.name}</h4>
-                <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">📅 ${t.date || 'TBD'}</p>
-                <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: var(--text-secondary);">📍 ${t.location || 'TBD'}</p>
-            `;
-            container.appendChild(card);
+        const groups = {
+            active: { title: '🔴 Live Right Now', items: [] },
+            published: { title: '🟠 Upcoming Tournaments', items: [] },
+            completed: { title: '🔵 Past Results', items: [] }
+        };
+
+        tournaments.forEach(t => {
+            if (groups[t.status]) groups[t.status].items.push(t);
         });
+
+        for (const [status, group] of Object.entries(groups)) {
+            if (group.items.length === 0) continue;
+
+            // Sort ascending by date
+            group.items.sort((a, b) => {
+                const dateA = new Date(a.date || '2099-01-01').getTime();
+                const dateB = new Date(b.date || '2099-01-01').getTime();
+                return dateA - dateB;
+            });
+
+            let sectionHTML = `
+                <div style="margin-bottom: 25px;">
+                    <h4 style="color: var(--text-primary); margin: 0 0 0 5px; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9;">
+                        ${group.title}
+                    </h4>
+                    
+                    <!-- Horizontal Scroll Container (Added padding to prevent glow clipping) -->
+                    <div style="display: flex; gap: 15px; overflow-x: auto; padding: 10px 10px; scrollbar-width: thin; -webkit-overflow-scrolling: touch;">
+            `;
+
+            group.items.forEach(t => {
+                const safeName = t.name.replace(/'/g, "&apos;").replace(/"/g, "&quot;");
+                const themeColor = t.theme_color || 'var(--accent-orange)';
+
+                sectionHTML += `
+                    <a href="?t=${encodeURIComponent(t.slug)}" class="tournament-card" style="--card-glow: ${themeColor}; position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; background: var(--surface-dark); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 14px; text-decoration: none; color: inherit; width: 340px; max-width: 85vw; flex: 0 0 auto; box-sizing: border-box; transition: box-shadow 0.3s ease, border-color 0.3s ease;">
+                        
+                        <!-- Floating Angled Header Accent (Rounded top-right only) -->
+                        <div style="position: absolute; top: 6px; right: 6px; width: 45%; height: 36px; background-color: ${themeColor}; clip-path: polygon(0 0, 100% 0, 100% 100%, 20px 100%); border-radius: 0 4px 0 0; opacity: 0.9;"></div>
+
+                        <!-- Tournament Title -->
+                        <div style="margin-bottom: 8px; position: relative; z-index: 1;">
+                            <h4 style="margin: 0; padding-bottom: 3px; color: var(--text-primary); font-size: 1rem; line-height: 1.4; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0px 1px 3px rgba(0,0,0,0.8);" title="${safeName}">
+                                ${safeName}
+                            </h4>
+                        </div>
+
+                        <!-- Inline Date & Location Footer -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px; position: relative; z-index: 1;">
+                            <div style="font-size: 0.8rem; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; flex-shrink: 0; text-shadow: 0px 1px 2px rgba(0,0,0,0.6);">
+                                <span>📅</span> ${t.date || 'TBD'}
+                            </div>
+                            <div style="font-size: 0.8rem; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; padding-left: 10px; text-shadow: 0px 1px 2px rgba(0,0,0,0.6);">
+                                <span>📍</span> ${t.location || 'TBD'}
+                            </div>
+                        </div>
+                    </a>
+                `;
+            });
+
+            sectionHTML += `</div></div>`;
+            container.innerHTML += sectionHTML;
+        }
     } catch (err) {
         console.error('Error loading tournament directory:', err);
         container.innerHTML = '<p style="color: var(--text-secondary);">Unable to load live events at this time.</p>';
@@ -118,7 +164,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (tournamentSlug) {
         document.getElementById('mainNav').style.display = 'flex';
 
-        // THE FIX: Changed to select('*') to grab all configuration columns
         const { data, error } = await supabase
             .from('tournaments')
             .select('*') 
@@ -135,6 +180,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             
             console.log("App Initialized. Active Tournament ID:", data.id);
+
+            if (typeof applyGameDayLockdown === 'function') {
+                applyGameDayLockdown(data.status);
+            }
         } else {
             console.error("Could not locate tournament by slug.");
         }
@@ -150,12 +199,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     document.getElementById('btn-adminBrackets')?.addEventListener('click', () => switchAdminView('adminBrackets'));
     
-    // NEW: Wire up the Bracket Scores button WITH A DELAY to fix the canvas rendering bug
     document.getElementById('btn-adminBracketScores')?.addEventListener('click', () => {
         switchAdminView('adminBracketScores');
         
-        // This tiny 10ms delay gives the browser time to paint the new tab 
-        // before we try to mathematically calculate and draw the brackets.
         setTimeout(() => {
             if (typeof renderBracketView === 'function') {
                 renderBracketView();
@@ -170,6 +216,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     initScores();
     initManagePools();
     initBracketAdmin();
+    
+    if (typeof initHiddenSuperAdmin === 'function') {
+        initHiddenSuperAdmin();
+    }
     
     if (getTournamentId()) {
         switchView('infoView'); 

@@ -326,16 +326,18 @@ function renderCanvas(canvasId, selectId, isAdmin) {
         const t1Text = (isT1Winner || (!isT1Winner && !isT2Winner && team1.resolved)) ? 'color: white;' : 'color: #94a3b8; font-weight: normal;';
         const t2Text = (isT2Winner || (!isT1Winner && !isT2Winner && team2.resolved)) ? 'color: white;' : 'color: #94a3b8; font-weight: normal;';
         
-        const t1RowStyle = isT1Winner ? 'background: color-mix(in srgb, var(--accent-orange) 15%, transparent); border: 1px solid var(--accent-orange);' : '';
-        const t2RowStyle = isT2Winner ? 'background: color-mix(in srgb, var(--accent-orange) 15%, transparent); border: 1px solid var(--accent-orange);' : '';
+        // Define the match's site color early so we can use it for the winner highlight
+        const textAccent = match.site ? getSiteColor(match.site) : 'var(--accent-orange)';
+        
+        // Inject the site color into the row style for the winning team
+        const t1RowStyle = isT1Winner ? `background: color-mix(in srgb, ${textAccent} 15%, transparent); border: 1px solid ${textAccent};` : '';
+        const t2RowStyle = isT2Winner ? `background: color-mix(in srgb, ${textAccent} 15%, transparent); border: 1px solid ${textAccent};` : '';
         
         const renderTeamBadge = (team) => {
             if (!team.resolved) return '';
             if (team.logo) return `<img src="${team.logo}" style="width: 14px; height: 14px; object-fit: contain; border-radius: 50%;">`;
             return `<div style="width: 14px; height: 14px; border-radius: 50%; background: ${team.color || '#475569'};"></div>`;
         };
-
-        const textAccent = match.site ? getSiteColor(match.site) : 'var(--accent-orange)';
 
         let adminEditButton = '';
         if (isAdmin) {

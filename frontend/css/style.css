@@ -128,10 +128,10 @@ body {
 }
 
 .tournament-card:hover {
-  transform: translateY(-3px);
-  border-color: var(--accent-orange);
-  /* Casts a shadow using your dynamic theme color */
-  box-shadow: 0 8px 15px color-mix(in srgb, var(--accent-orange) 15%, transparent);
+    border-color: var(--card-glow);
+    /* Creates a matching glow effect using the custom variable */
+    box-shadow: 0 0 12px var(--card-glow); 
+    /* Remove any transform: translateY() that was here previously */
 }
 
 .tournament-card-header {
