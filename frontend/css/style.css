@@ -127,18 +127,30 @@ body {
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
 }
 
-.tournament-card:hover {
-    border-color: var(--card-glow);
-    /* Creates a matching glow effect using the custom variable */
-    box-shadow: 0 0 12px var(--card-glow); 
-    /* Remove any transform: translateY() that was here previously */
+/* 1. The Accent Banner Default State */
+.card-accent {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 20%;
+    height: 36px;
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 20px 100%);
+    border-radius: 0 4px 0 0;
+    opacity: 0.9;
+    transition: width 0.3s ease, clip-path 0.3s ease, border-radius 0.3s ease;
 }
 
-.tournament-card-header {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
+/* 2. The Accent Banner Expansion on Hover */
+.tournament-card:hover .card-accent {
+    width: calc(100% - 12px);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+    border-radius: 4px 4px 0 0; 
+}
+
+/* 3. The Outer Glow on Hover */
+.tournament-card:hover {
+    border-color: var(--card-glow);
+    box-shadow: 0 0 12px var(--card-glow); 
 }
 
 .tournament-card-header h4 {

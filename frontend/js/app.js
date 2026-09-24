@@ -111,10 +111,10 @@ export async function loadTournamentDirectory() {
                 const themeColor = t.theme_color || 'var(--accent-orange)';
 
                 sectionHTML += `
-                    <a href="?t=${encodeURIComponent(t.slug)}" class="tournament-card" style="--card-glow: ${themeColor}; position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; background: var(--surface-dark); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 14px; text-decoration: none; color: inherit; width: 340px; max-width: 85vw; flex: 0 0 auto; box-sizing: border-box; transition: box-shadow 0.3s ease, border-color 0.3s ease;">
+                    <a href="?t=${encodeURIComponent(t.slug)}" class="tournament-card" style="--card-glow: ${themeColor}; position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; background: var(--surface-dark); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 14px; text-decoration: none; color: inherit; width: 380px; max-width: 85vw; flex: 0 0 auto; box-sizing: border-box; transition: box-shadow 0.3s ease, border-color 0.3s ease;">
                         
-                        <!-- Floating Angled Header Accent (Rounded top-right only) -->
-                        <div style="position: absolute; top: 6px; right: 6px; width: 45%; height: 36px; background-color: ${themeColor}; clip-path: polygon(0 0, 100% 0, 100% 100%, 20px 100%); border-radius: 0 4px 0 0; opacity: 0.9;"></div>
+                        <!-- Animated Header Accent -->
+                        <div class="card-accent" style="background-color: ${themeColor};"></div>
 
                         <!-- Tournament Title -->
                         <div style="margin-bottom: 8px; position: relative; z-index: 1;">
