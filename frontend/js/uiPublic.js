@@ -131,7 +131,12 @@ export function renderPublicPools() {
     pools.forEach(pool => {
         const standings = standingsByPool[pool.id] || [];
         const poolMatches = allMatches.filter(m => m.pool_id === pool.id).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
-        const headerColor = getSiteColor(pool.site);
+        
+        // Map the pool's site to the tournament's specific bracket config colors
+        let headerColor = 'var(--accent-orange)';
+        if (pool.site === config.site1Name) headerColor = config.site1Color || headerColor;
+        else if (pool.site === config.site2Name) headerColor = config.site2Color || headerColor;
+        else if (pool.site === config.site3Name) headerColor = config.site3Color || headerColor;
         
         const isPoolComplete = poolMatches.length > 0 && poolMatches.every(m => m.status === 'completed' || m.status === 'complete');
         const maxMatches = standings.length > 0 ? standings.length - 1 : 0; 
