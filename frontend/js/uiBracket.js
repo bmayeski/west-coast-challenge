@@ -1223,9 +1223,21 @@ export function printBrackets() {
             let boxes = '';
             for (let i = 1; i <= bracketSets; i++) {
                 let score = matchRaw[`s${i}${teamLetter}`];
-                // Catch actual null, undefined, or string "null" and print a dash
+                
+                // Catch actual null, undefined, or string "null"
                 if (score == null || score === 'null' || score === '') {
-                    score = '-';
+                    score = ''; // Default to completely blank so it can be written in by hand
+                    
+                    // If it is a best 2-out-of-3 format, we are on the 3rd set, 
+                    // AND the first two sets have already been played, insert a dash.
+                    if (bracketSets === 3 && i === 3) {
+                        const s1 = matchRaw[`s1${teamLetter}`];
+                        const s2 = matchRaw[`s2${teamLetter}`];
+                        if (s1 != null && s1 !== 'null' && s1 !== '' && 
+                            s2 != null && s2 !== 'null' && s2 !== '') {
+                            score = '-';
+                        }
+                    }
                 }
                 boxes += `<div class="score-box">${score}</div>`;
             }
