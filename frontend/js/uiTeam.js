@@ -333,7 +333,20 @@ export function renderMyTeam(teamId) {
 
     // Determine the next upcoming match index for pool matches to highlight it automatically
     const myPoolMatches = matches.filter(m => m.teamA === team.id || m.teamB === team.id || m.ref === team.id);
-    myPoolMatches.sort((a, b) => (a.time || '').localeCompare(b.time || '') || matches.indexOf(a) - matches.indexOf(b));
+    myPoolMatches.sort((a, b) => {
+        const timeCompare = (a.time || '').localeCompare(b.time || '');
+        if (timeCompare !== 0) return timeCompare;
+        
+        const getSeedSum = (match) => {
+            const tA = teams.find(t => t.id === match.teamA);
+            const tB = teams.find(t => t.id === match.teamB);
+            const sA = tA ? parseInt(tA.seed) || 99 : 99;
+            const sB = tB ? parseInt(tB.seed) || 99 : 99;
+            return sA + sB;
+        };
+        
+        return getSeedSum(b) - getSeedSum(a);
+    });
     const nextPoolMatchId = myPoolMatches.find(m => m.status !== 'completed' && m.status !== 'complete')?.id;
 
     // 4. MATCH CARD TEMPLATE

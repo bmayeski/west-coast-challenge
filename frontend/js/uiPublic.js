@@ -155,7 +155,21 @@ export function renderPublicPools() {
         const standings = standingsByPool[pool.id] || [];
         const poolMatches = allMatches
             .filter(m => m.pool_id === pool.id && !(typeof m.teamA === 'string' && m.teamA.startsWith('seed:')))
-            .sort((a, b) => (a.time || '').localeCompare(b.time || '') || allMatches.indexOf(a) - allMatches.indexOf(b));
+            .sort((a, b) => {
+                const timeCompare = (a.time || '').localeCompare(b.time || '');
+                if (timeCompare !== 0) return timeCompare;
+                
+                // Tie-breaker: 3v4 match (higher seed sum) goes before 1v2 match
+                const getSeedSum = (match) => {
+                    const tA = allTeams.find(t => t.id === match.teamA);
+                    const tB = allTeams.find(t => t.id === match.teamB);
+                    const sA = tA ? parseInt(tA.seed) || 99 : 99;
+                    const sB = tB ? parseInt(tB.seed) || 99 : 99;
+                    return sA + sB;
+                };
+                
+                return getSeedSum(b) - getSeedSum(a);
+            });
         
         // Map the pool's site to the tournament's specific bracket config colors
         let headerColor = 'var(--accent-orange)';

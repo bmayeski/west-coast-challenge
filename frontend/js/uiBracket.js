@@ -1203,13 +1203,32 @@ export function printBrackets() {
                 }
 
                 const poolStandings = standingsByPool[poolId] || [];
-                let isComplete = false;
-                if (poolStandings.length > 0) {
+                let isLocked = false;
+                
+                if (poolStandings.length > 0 && poolStandings[rankIndex]) {
                     const expectedMatches = poolStandings.length === 3 ? 2 : 3;
-                    isComplete = poolStandings.every(t => t.matchesPlayed >= expectedMatches);
+                    const getPlayed = (t) => t.matchesPlayed !== undefined ? t.matchesPlayed : ((t.mw || 0) + (t.ml || 0));
+                    const getWins = (t) => t.matchesWon !== undefined ? t.matchesWon : (t.mw || 0);
+                    
+                    const team = poolStandings[rankIndex];
+                    const teamPlayed = getPlayed(team);
+                    const teamWins = getWins(team);
+
+                    if (teamPlayed >= expectedMatches) {
+                        isLocked = true;
+                        for (let i = 0; i < rankIndex; i++) {
+                            const above = poolStandings[i];
+                            if (getPlayed(above) < expectedMatches && getWins(above) <= teamWins) isLocked = false;
+                        }
+                        for (let i = rankIndex + 1; i < poolStandings.length; i++) {
+                            const below = poolStandings[i];
+                            const belowPlayed = getPlayed(below);
+                            if (belowPlayed < expectedMatches && (getWins(below) + (expectedMatches - belowPlayed)) >= teamWins) isLocked = false;
+                        }
+                    }
                 }
                 
-                if (isComplete && poolStandings[rankIndex]) {
+                if (isLocked) {
                     return { name: poolStandings[rankIndex].name, hint: `${rankStr} ${poolName}`, travel, resolved: true };
                 }
                 return { name: '', hint: `${rankStr} ${poolName}`, travel, resolved: false };
