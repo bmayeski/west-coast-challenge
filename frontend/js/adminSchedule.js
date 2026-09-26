@@ -144,7 +144,7 @@ function handleAutoGenerate() {
     let generatedMatches = [];
 
     // --- DIRECTOR'S CUSTOM 14-TEAM SCHEDULE (POOL PLAY ONLY) ---
-    if (assignedTeamsCount === 14 && sortedPoolIds.length >= 4) {
+    if ((assignedTeamsCount === 14 || assignedTeamsCount === 13) && sortedPoolIds.length >= 4) {
         const [pA, pB, pC, pD] = sortedPoolIds;
         
         const getSorted = (pid) => poolsMap[pid].sort((a, b) => (parseInt(a.seed) || 99) - (parseInt(b.seed) || 99));
@@ -177,13 +177,19 @@ function handleAutoGenerate() {
         addMatch(pB, teamsB[2].id, teamsB[3].id, teamsB[1].id, incrementMins * 4); // 12pm
         addMatch(pB, teamsB[0].id, teamsB[1].id, teamsB[3].id, incrementMins * 4); // 12pm (Simultaneous)
 
-        // POOL C (4 Teams): 8, 9, 10, 11, and two at 12pm
-        addMatch(pC, teamsC[0].id, teamsC[2].id, teamsC[1].id, 0);
-        addMatch(pC, teamsC[1].id, teamsC[3].id, teamsC[0].id, incrementMins);
-        addMatch(pC, teamsC[0].id, teamsC[3].id, teamsC[2].id, incrementMins * 2);
-        addMatch(pC, teamsC[1].id, teamsC[2].id, teamsC[0].id, incrementMins * 3);
-        addMatch(pC, teamsC[2].id, teamsC[3].id, teamsC[1].id, incrementMins * 4); // 12pm
-        addMatch(pC, teamsC[0].id, teamsC[1].id, teamsC[3].id, incrementMins * 4); // 12pm (Simultaneous)
+        // POOL C (Dynamic 3 or 4 Teams)
+        if (teamsC.length === 3) {
+            addMatch(pC, teamsC[0].id, teamsC[2].id, teamsC[1].id, 0);
+            addMatch(pC, teamsC[1].id, teamsC[2].id, teamsC[0].id, incrementMins);
+            addMatch(pC, teamsC[0].id, teamsC[1].id, teamsC[2].id, incrementMins * 2);
+        } else {
+            addMatch(pC, teamsC[0].id, teamsC[2].id, teamsC[1].id, 0);
+            addMatch(pC, teamsC[1].id, teamsC[3].id, teamsC[0].id, incrementMins);
+            addMatch(pC, teamsC[0].id, teamsC[3].id, teamsC[2].id, incrementMins * 2);
+            addMatch(pC, teamsC[1].id, teamsC[2].id, teamsC[0].id, incrementMins * 3);
+            addMatch(pC, teamsC[2].id, teamsC[3].id, teamsC[1].id, incrementMins * 4); 
+            addMatch(pC, teamsC[0].id, teamsC[1].id, teamsC[3].id, incrementMins * 4); 
+        }
 
         // POOL D (3 Teams): 8am, 9am, 10am
         addMatch(pD, teamsD[0].id, teamsD[2].id, teamsD[1].id, 0);
