@@ -198,7 +198,7 @@ export function renderAdminPools() {
                                 seedDisplay = `<span style="color: var(--text-secondary); font-size: 0.8rem;">${team.seed === 99 ? '-' : team.seed}</span>`;
                             }
 
-                            const logoHtml = team.logo_id ? `<img src="${team.logo_id}" style="width: 24px; height: 24px; object-fit: contain; border-radius: 50%; flex-shrink: 0;">` : `<div style="width: 20px; height: 20px; border-radius: 50%; background: ${team.color || '#3b82f6'}; flex-shrink: 0;"></div>`;
+                            const logoHtml = team.logo_id ? `<img src="${team.logo_id}" style="width: 24px; height: 24px; object-fit: contain; flex-shrink: 0;">` : `<div style="width: 20px; height: 20px; sbackground: ${team.color || '#3b82f6'}; flex-shrink: 0;"></div>`;
                             const nameColor = team.color ? ensureReadableColor(team.color) : 'var(--text-primary)';
                             
                             const setSign = team.setDiff > 0 ? '+' : '';
