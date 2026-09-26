@@ -155,7 +155,7 @@ export function renderPublicPools() {
         const standings = standingsByPool[pool.id] || [];
         const poolMatches = allMatches
             .filter(m => m.pool_id === pool.id && !(typeof m.teamA === 'string' && m.teamA.startsWith('seed:')))
-            .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+            .sort((a, b) => (a.time || '').localeCompare(b.time || '') || allMatches.indexOf(a) - allMatches.indexOf(b));
         
         // Map the pool's site to the tournament's specific bracket config colors
         let headerColor = 'var(--accent-orange)';

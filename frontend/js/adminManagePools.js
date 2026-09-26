@@ -568,7 +568,7 @@ export function printPoolSheets() {
         const siteColor = getSiteColor(pool.site);
         const poolMatches = allMatches
             .filter(m => m.pool_id === pool.id && !(typeof m.teamA === 'string' && m.teamA.startsWith('seed:')))
-            .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+            .sort((a, b) => (a.time || '').localeCompare(b.time || '') || allMatches.indexOf(a) - allMatches.indexOf(b));
         
         // Calculate Pool Stats Inline
         const teamStats = {};

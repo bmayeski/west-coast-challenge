@@ -333,7 +333,7 @@ export function renderMyTeam(teamId) {
 
     // Determine the next upcoming match index for pool matches to highlight it automatically
     const myPoolMatches = matches.filter(m => m.teamA === team.id || m.teamB === team.id || m.ref === team.id);
-    myPoolMatches.sort((a, b) => a.time.localeCompare(b.time));
+    myPoolMatches.sort((a, b) => (a.time || '').localeCompare(b.time || '') || matches.indexOf(a) - matches.indexOf(b));
     const nextPoolMatchId = myPoolMatches.find(m => m.status !== 'completed' && m.status !== 'complete')?.id;
 
     // 4. MATCH CARD TEMPLATE
