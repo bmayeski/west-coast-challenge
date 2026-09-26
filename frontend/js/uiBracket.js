@@ -198,21 +198,36 @@ export function renderCanvas(canvasId, selectId, isAdmin) {
             { col: 'Finals', rawTime: t2, id: 'G7', t1: `winner:G5`, t2: `winner:G6`, ref: `loser:G5` }
         ];
     } else if (selectedDivision === 'silver') {
-        bracketData = [
-            // Silver Quarterfinals (Play-ins paired with Visual Byes)
-            { col: 'Quarterfinals', rawTime: t0, id: 'S1', t1: `seed:${pA}:3`, t2: `seed:${pB}:4`, ref: `loser:G1` },
-            { col: 'Quarterfinals', rawTime: t0, id: 'S_Bye1', t1: `seed:${pC}:3`, t2: `BYE`, isBye: true, feedsTo: 'S3', site: pC_site },
-            
-            { col: 'Quarterfinals', rawTime: t0, id: 'S2', t1: `seed:${pC}:4`, t2: `seed:${pD}:3`, ref: `loser:G3` },
-            { col: 'Quarterfinals', rawTime: t0, id: 'S_Bye2', t1: `seed:${pB}:3`, t2: `BYE`, isBye: true, feedsTo: 'S4', site: pB_site },
+        const totalTeams = getTeams().length;
+        
+        if (totalTeams === 13) {
+            bracketData = [
+                // 13-Team Format (5 Silver Teams: 1 Play-in, 3 Byes)
+                { col: 'Quarterfinals', rawTime: t0, id: 'S1', t1: `seed:${pA}:3`, t2: `seed:${pB}:4`, ref: `loser:G1` },
+                { col: 'Quarterfinals', rawTime: t0, id: 'S_Bye1', t1: `seed:${pC}:3`, t2: `BYE`, isBye: true, feedsTo: 'S3', site: pC_site },
+                
+                { col: 'Quarterfinals', rawTime: t0, id: 'S_Bye2', t1: `seed:${pD}:3`, t2: `BYE`, isBye: true, feedsTo: 'S4', site: pC_site },
+                { col: 'Quarterfinals', rawTime: t0, id: 'S_Bye3', t1: `seed:${pB}:3`, t2: `BYE`, isBye: true, feedsTo: 'S4', site: pB_site },
 
-            // Silver Semifinals (Play-in winners take Top, Auto-advancers take Bottom)
-            { col: 'Semifinals', rawTime: t1, id: 'S3', t1: `winner:S1`, t2: `seed:${pC}:3`, ref: `loser:S1` },
-            { col: 'Semifinals', rawTime: t1, id: 'S4', t1: `winner:S2`, t2: `seed:${pB}:3`, ref: `loser:S2` },
+                // Semifinals
+                { col: 'Semifinals', rawTime: t1, id: 'S3', t1: `winner:S1`, t2: `seed:${pC}:3`, ref: `loser:S1` },
+                { col: 'Semifinals', rawTime: t1, id: 'S4', t1: `seed:${pD}:3`, t2: `seed:${pB}:3`, ref: `loser:G3` },
 
-            // Silver Finals
-            { col: 'Finals', rawTime: t2, id: 'S5', t1: `winner:S3`, t2: `winner:S4`, ref: `loser:S3` }
-        ];
+                // Finals
+                { col: 'Finals', rawTime: t2, id: 'S5', t1: `winner:S3`, t2: `winner:S4`, ref: `loser:S3` }
+            ];
+        } else {
+            bracketData = [
+                // 14-Team Format
+                { col: 'Quarterfinals', rawTime: t0, id: 'S1', t1: `seed:${pA}:3`, t2: `seed:${pB}:4`, ref: `loser:G1` },
+                { col: 'Quarterfinals', rawTime: t0, id: 'S_Bye1', t1: `seed:${pC}:3`, t2: `BYE`, isBye: true, feedsTo: 'S3', site: pC_site },
+                { col: 'Quarterfinals', rawTime: t0, id: 'S2', t1: `seed:${pC}:4`, t2: `seed:${pD}:3`, ref: `loser:G3` },
+                { col: 'Quarterfinals', rawTime: t0, id: 'S_Bye2', t1: `seed:${pB}:3`, t2: `BYE`, isBye: true, feedsTo: 'S4', site: pB_site },
+                { col: 'Semifinals', rawTime: t1, id: 'S3', t1: `winner:S1`, t2: `seed:${pC}:3`, ref: `loser:S1` },
+                { col: 'Semifinals', rawTime: t1, id: 'S4', t1: `winner:S2`, t2: `seed:${pB}:3`, ref: `loser:S2` },
+                { col: 'Finals', rawTime: t2, id: 'S5', t1: `winner:S3`, t2: `winner:S4`, ref: `loser:S3` }
+            ];
+        }
     }
 
     bracketData = bracketData.map(m => {
@@ -1159,15 +1174,28 @@ export function printBrackets() {
                 { col: 'Finals', rawTime: t2, id: 'G7', t1: `winner:G5`, t2: `winner:G6`, ref: `loser:G5` }
             ];
         } else if (div === 'Silver') {
-            bracketData = [
-                { col: 'Quarterfinals', rawTime: t0, id: 'S1', t1: `seed:${pA}:3`, t2: `seed:${pB}:4`, ref: `loser:G1` },
-                { col: 'Quarterfinals', rawTime: t0, id: 'S_Bye1', t1: `seed:${pC}:3`, t2: `BYE`, isBye: true, feedsTo: 'S3', site: pC_site },
-                { col: 'Quarterfinals', rawTime: t0, id: 'S2', t1: `seed:${pC}:4`, t2: `seed:${pD}:3`, ref: `loser:G3` },
-                { col: 'Quarterfinals', rawTime: t0, id: 'S_Bye2', t1: `seed:${pB}:3`, t2: `BYE`, isBye: true, feedsTo: 'S4', site: pB_site },
-                { col: 'Semifinals', rawTime: t1, id: 'S3', t1: `winner:S1`, t2: `seed:${pC}:3`, ref: `loser:S1` },
-                { col: 'Semifinals', rawTime: t1, id: 'S4', t1: `winner:S2`, t2: `seed:${pB}:3`, ref: `loser:S2` },
-                { col: 'Finals', rawTime: t2, id: 'S5', t1: `winner:S3`, t2: `winner:S4`, ref: `loser:S3` }
-            ];
+            const totalTeams = allTeams.length;
+            if (totalTeams === 13) {
+                bracketData = [
+                    { col: 'Quarterfinals', rawTime: t0, id: 'S1', t1: `seed:${pA}:3`, t2: `seed:${pB}:4`, ref: `loser:G1` },
+                    { col: 'Quarterfinals', rawTime: t0, id: 'S_Bye1', t1: `seed:${pC}:3`, t2: `BYE`, isBye: true, feedsTo: 'S3', site: pC_site },
+                    { col: 'Quarterfinals', rawTime: t0, id: 'S_Bye2', t1: `seed:${pD}:3`, t2: `BYE`, isBye: true, feedsTo: 'S4', site: pC_site },
+                    { col: 'Quarterfinals', rawTime: t0, id: 'S_Bye3', t1: `seed:${pB}:3`, t2: `BYE`, isBye: true, feedsTo: 'S4', site: pB_site },
+                    { col: 'Semifinals', rawTime: t1, id: 'S3', t1: `winner:S1`, t2: `seed:${pC}:3`, ref: `loser:S1` },
+                    { col: 'Semifinals', rawTime: t1, id: 'S4', t1: `seed:${pD}:3`, t2: `seed:${pB}:3`, ref: `loser:G3` },
+                    { col: 'Finals', rawTime: t2, id: 'S5', t1: `winner:S3`, t2: `winner:S4`, ref: `loser:S3` }
+                ];
+            } else {
+                bracketData = [
+                    { col: 'Quarterfinals', rawTime: t0, id: 'S1', t1: `seed:${pA}:3`, t2: `seed:${pB}:4`, ref: `loser:G1` },
+                    { col: 'Quarterfinals', rawTime: t0, id: 'S_Bye1', t1: `seed:${pC}:3`, t2: `BYE`, isBye: true, feedsTo: 'S3', site: pC_site },
+                    { col: 'Quarterfinals', rawTime: t0, id: 'S2', t1: `seed:${pC}:4`, t2: `seed:${pD}:3`, ref: `loser:G3` },
+                    { col: 'Quarterfinals', rawTime: t0, id: 'S_Bye2', t1: `seed:${pB}:3`, t2: `BYE`, isBye: true, feedsTo: 'S4', site: pB_site },
+                    { col: 'Semifinals', rawTime: t1, id: 'S3', t1: `winner:S1`, t2: `seed:${pC}:3`, ref: `loser:S1` },
+                    { col: 'Semifinals', rawTime: t1, id: 'S4', t1: `winner:S2`, t2: `seed:${pB}:3`, ref: `loser:S2` },
+                    { col: 'Finals', rawTime: t2, id: 'S5', t1: `winner:S3`, t2: `winner:S4`, ref: `loser:S3` }
+                ];
+            }
         }
 
         const savedScores = tournamentData?.bracket_scores || {};
@@ -1416,33 +1444,64 @@ export function printBrackets() {
                 </div>
             </div>`;
         } else if (div === 'Silver') {
-            html += `<div class="col">
-                <div class="round-title">Quarterfinals</div>
-                <div class="pair">
-                    ${renderMatchBox(bracketData.find(m => m.id === 'S1'))}
-                    ${renderByeBox(bracketData.find(m => m.id === 'S_Bye1'))}
-                    <div class="connector"></div><div class="stem"></div>
+            const totalTeams = allTeams.length;
+            if (totalTeams === 13) {
+                html += `<div class="col">
+                    <div class="round-title">Quarterfinals</div>
+                    <div class="pair">
+                        ${renderMatchBox(bracketData.find(m => m.id === 'S1'))}
+                        ${renderByeBox(bracketData.find(m => m.id === 'S_Bye1'))}
+                        <div class="connector"></div><div class="stem"></div>
+                    </div>
+                    <div class="pair">
+                        ${renderByeBox(bracketData.find(m => m.id === 'S_Bye2'))}
+                        ${renderByeBox(bracketData.find(m => m.id === 'S_Bye3'))}
+                        <div class="connector"></div><div class="stem"></div>
+                    </div>
                 </div>
-                <div class="pair">
-                    ${renderMatchBox(bracketData.find(m => m.id === 'S2'))}
-                    ${renderByeBox(bracketData.find(m => m.id === 'S_Bye2'))}
-                    <div class="connector"></div><div class="stem"></div>
+                <div class="col">
+                    <div class="round-title">Semifinals</div>
+                    <div class="pair">
+                        ${renderMatchBox(bracketData.find(m => m.id === 'S3'))}
+                        ${renderMatchBox(bracketData.find(m => m.id === 'S4'))}
+                        <div class="connector"></div><div class="stem"></div>
+                    </div>
                 </div>
-            </div>
-            <div class="col">
-                <div class="round-title">Semifinals</div>
-                <div class="pair">
-                    ${renderMatchBox(bracketData.find(m => m.id === 'S3'))}
-                    ${renderMatchBox(bracketData.find(m => m.id === 'S4'))}
-                    <div class="connector"></div><div class="stem"></div>
+                <div class="col">
+                    <div class="round-title">Championship</div>
+                    <div class="pair" style="justify-content: center;">
+                        ${renderMatchBox(bracketData.find(m => m.id === 'S5'))}
+                    </div>
+                </div>`;
+            } else {
+                html += `<div class="col">
+                    <div class="round-title">Quarterfinals</div>
+                    <div class="pair">
+                        ${renderMatchBox(bracketData.find(m => m.id === 'S1'))}
+                        ${renderByeBox(bracketData.find(m => m.id === 'S_Bye1'))}
+                        <div class="connector"></div><div class="stem"></div>
+                    </div>
+                    <div class="pair">
+                        ${renderMatchBox(bracketData.find(m => m.id === 'S2'))}
+                        ${renderByeBox(bracketData.find(m => m.id === 'S_Bye2'))}
+                        <div class="connector"></div><div class="stem"></div>
+                    </div>
                 </div>
-            </div>
-            <div class="col">
-                <div class="round-title">Championship</div>
-                <div class="pair" style="justify-content: center;">
-                    ${renderMatchBox(bracketData.find(m => m.id === 'S5'))}
+                <div class="col">
+                    <div class="round-title">Semifinals</div>
+                    <div class="pair">
+                        ${renderMatchBox(bracketData.find(m => m.id === 'S3'))}
+                        ${renderMatchBox(bracketData.find(m => m.id === 'S4'))}
+                        <div class="connector"></div><div class="stem"></div>
+                    </div>
                 </div>
-            </div>`;
+                <div class="col">
+                    <div class="round-title">Championship</div>
+                    <div class="pair" style="justify-content: center;">
+                        ${renderMatchBox(bracketData.find(m => m.id === 'S5'))}
+                    </div>
+                </div>`;
+            }
         }
 
         html += `
