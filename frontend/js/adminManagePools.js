@@ -28,7 +28,6 @@ export function initManagePools() {
             document.getElementById('poolDetailsModalMatchup').innerText = `${btn.dataset.t1} vs ${btn.dataset.t2}`;
             
             document.getElementById('poolDetailsTime').value = btn.dataset.time || '';
-            document.getElementById('poolDetailsCourt').value = btn.dataset.court || '';
             
             const allTeams = getTeams();
             const sortedTeams = [...allTeams].sort((a, b) => a.name.localeCompare(b.name));
@@ -393,12 +392,12 @@ async function handleSavePoolDetails(btn) {
     
     const matchId = document.getElementById('poolDetailsMatchId').value;
     const time = document.getElementById('poolDetailsTime').value;
-    const court = document.getElementById('poolDetailsCourt').value;
     const ref = document.getElementById('poolDetailsRef').value;
     
+    // Send only the time and ref to Supabase to prevent the column error
     const { error } = await supabase
         .from('matches')
-        .update({ time, court, ref })
+        .update({ time, ref })
         .eq('id', matchId);
         
     if (error) {
@@ -408,7 +407,6 @@ async function handleSavePoolDetails(btn) {
         const m = allMatches.find(m => m.id === matchId);
         if (m) {
             m.time = time;
-            m.court = court;
             m.ref = ref;
         }
         document.getElementById('editPoolDetailsModal').style.display = 'none';
@@ -560,14 +558,11 @@ export function printPoolSheets() {
     `;
 
     pools.forEach(pool => {
-        // --- NEW: Dynamic Advancement Text based on Location ---
-        let poolAdvancementText = "";
-        const pName = (pool.name || '').toUpperCase();
-        if (pName.includes('A') || pName.includes('B')) {
-            poolAdvancementText = "1st & 2nd advance to Gold. 3rd Pool B auto-advances. 3rd A plays 4th B for Silver.";
-        } else {
-            poolAdvancementText = "1st & 2nd play Crossover for Gold. 3rd Pool C auto-advances. 4th C plays 3rd D for Silver.";
-        }
+        // --- NEW: Simplified Advancement Text ---
+        const poolTeamsCount = allTeams.filter(t => t.pool_id === pool.id).length;
+        const poolAdvancementText = poolTeamsCount > 3 
+            ? "1st & 2nd advance to Gold. 3rd & 4th advance to Silver. See brackets for match times and locations."
+            : "1st & 2nd advance to Gold. 3rd advances to Silver. See brackets for match times and locations.";
 
         const poolTeams = allTeams.filter(t => t.pool_id === pool.id).sort((a, b) => a.seed - b.seed);
         const siteColor = getSiteColor(pool.site);
