@@ -337,15 +337,14 @@ export function renderMyTeam(teamId) {
         const timeCompare = (a.time || '').localeCompare(b.time || '');
         if (timeCompare !== 0) return timeCompare;
         
-        const getSeedSum = (match) => {
+        const getMatchWeight = (match) => {
             const tA = teams.find(t => t.id === match.teamA);
             const tB = teams.find(t => t.id === match.teamB);
-            const sA = tA ? parseInt(tA.seed) || 99 : 99;
-            const sB = tB ? parseInt(tB.seed) || 99 : 99;
-            return sA + sB;
+            const isSeed1 = (tA && parseInt(tA.seed) === 1) || (tB && parseInt(tB.seed) === 1);
+            return isSeed1 ? 1 : 0; 
         };
         
-        return getSeedSum(b) - getSeedSum(a);
+        return getMatchWeight(a) - getMatchWeight(b);
     });
     const nextPoolMatchId = myPoolMatches.find(m => m.status !== 'completed' && m.status !== 'complete')?.id;
 

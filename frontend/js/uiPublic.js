@@ -159,16 +159,15 @@ export function renderPublicPools() {
                 const timeCompare = (a.time || '').localeCompare(b.time || '');
                 if (timeCompare !== 0) return timeCompare;
                 
-                // Tie-breaker: 3v4 match (higher seed sum) goes before 1v2 match
-                const getSeedSum = (match) => {
+                // Tie-breaker: The match featuring Seed 1 (the 1v2 match) always goes last
+                const getMatchWeight = (match) => {
                     const tA = allTeams.find(t => t.id === match.teamA);
                     const tB = allTeams.find(t => t.id === match.teamB);
-                    const sA = tA ? parseInt(tA.seed) || 99 : 99;
-                    const sB = tB ? parseInt(tB.seed) || 99 : 99;
-                    return sA + sB;
+                    const isSeed1 = (tA && parseInt(tA.seed) === 1) || (tB && parseInt(tB.seed) === 1);
+                    return isSeed1 ? 1 : 0; 
                 };
                 
-                return getSeedSum(b) - getSeedSum(a);
+                return getMatchWeight(a) - getMatchWeight(b);
             });
         
         // Map the pool's site to the tournament's specific bracket config colors
