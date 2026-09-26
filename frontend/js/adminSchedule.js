@@ -2,6 +2,7 @@
 import { supabase } from './supabaseClient.js';
 import { getTournamentId, getTeams, getPools, setMatches } from './state.js'; 
 import { renderPublicPools } from './uiPublic.js';
+import { getAllPoolStandings } from './uiMath.js';
 
 // Standard USAV bracket templates. Numbers represent array indexes (0 = Seed 1, 1 = Seed 2, etc.)
 const SCHEDULE_TEMPLATES = {
@@ -124,10 +125,13 @@ function handleAutoGenerate() {
     }
 
     const poolsMap = {};
+    let assignedTeamsCount = 0;
+    
     teams.forEach(team => {
         if (team.pool_id) {
             if (!poolsMap[team.pool_id]) poolsMap[team.pool_id] = [];
             poolsMap[team.pool_id].push(team);
+            assignedTeamsCount++;
         }
     });
 
@@ -139,56 +143,55 @@ function handleAutoGenerate() {
 
     let generatedMatches = [];
 
-    sortedPoolIds.forEach(poolId => {
-        const poolTeams = poolsMap[poolId];
+    // --- DIRECTOR'S CUSTOM 14-TEAM SCHEDULE (POOL PLAY ONLY) ---
+    if (assignedTeamsCount === 14 && sortedPoolIds.length >= 4) {
+        const [pA, pB, pC, pD] = sortedPoolIds;
         
-        poolTeams.sort((a, b) => {
-            const seedA = parseInt(a.seed, 10) || 99;
-            const seedB = parseInt(b.seed, 10) || 99;
-            return seedA - seedB;
-        });
+        const getSorted = (pid) => poolsMap[pid].sort((a, b) => (parseInt(a.seed) || 99) - (parseInt(b.seed) || 99));
+        const teamsA = getSorted(pA);
+        const teamsB = getSorted(pB);
+        const teamsC = getSorted(pC);
+        const teamsD = getSorted(pD);
         
-        let currentMinutes = timeToMinutes(startTimeInput ? startTimeInput.value : '08:00');
-        const template = SCHEDULE_TEMPLATES[poolTeams.length];
-        
-        if (template) {
-            template.forEach(matchInfo => {
-                const teamA = poolTeams[matchInfo[0]];
-                const teamB = poolTeams[matchInfo[1]];
-                const ref = poolTeams[matchInfo[2]];
+        const startMins = timeToMinutes(startTimeInput ? startTimeInput.value : '08:00');
 
-                if (teamA && teamB) {
-                    generatedMatches.push({
-                        id: crypto.randomUUID(), 
-                        pool_id: poolId, 
-                        teamA: teamA.id, 
-                        teamB: teamB.id, 
-                        ref: ref ? ref.id : null, 
-                        time: minutesToTimeStr(currentMinutes) 
-                    });
-                    currentMinutes += incrementMins;
-                }
+        const addMatch = (poolId, t1, t2, ref, timeOffset) => {
+            generatedMatches.push({
+                id: crypto.randomUUID(),
+                pool_id: poolId,
+                teamA: t1, teamB: t2, ref: ref,
+                time: minutesToTimeStr(startMins + timeOffset)
             });
-        } else {
-            for (let i = 0; i < poolTeams.length; i++) {
-                for (let j = i + 1; j < poolTeams.length; j++) {
-                    const refTeam = poolTeams.find(t => t.id !== poolTeams[i].id && t.id !== poolTeams[j].id);
-                    generatedMatches.push({
-                        id: crypto.randomUUID(), 
-                        pool_id: poolId, 
-                        teamA: poolTeams[i].id, 
-                        teamB: poolTeams[j].id, 
-                        ref: refTeam ? refTeam.id : null, 
-                        time: minutesToTimeStr(currentMinutes) 
-                    });
-                    currentMinutes += incrementMins;
-                }
-            }
-        }
-    });
+        };
 
-    if (generatedMatches.length === 0) {
-        alert("Not enough teams assigned to pools to generate matches.");
+        // POOL A (3 Teams): 8am, 9am, 10am
+        addMatch(pA, teamsA[0].id, teamsA[2].id, teamsA[1].id, 0);
+        addMatch(pA, teamsA[1].id, teamsA[2].id, teamsA[0].id, incrementMins);
+        addMatch(pA, teamsA[0].id, teamsA[1].id, teamsA[2].id, incrementMins * 2);
+
+        // POOL B (4 Teams): 8, 9, 10, 11, and two at 12pm
+        addMatch(pB, teamsB[0].id, teamsB[2].id, teamsB[1].id, 0);
+        addMatch(pB, teamsB[1].id, teamsB[3].id, teamsB[0].id, incrementMins);
+        addMatch(pB, teamsB[0].id, teamsB[3].id, teamsB[2].id, incrementMins * 2);
+        addMatch(pB, teamsB[1].id, teamsB[2].id, teamsB[0].id, incrementMins * 3);
+        addMatch(pB, teamsB[2].id, teamsB[3].id, teamsB[1].id, incrementMins * 4); // 12pm
+        addMatch(pB, teamsB[0].id, teamsB[1].id, teamsB[3].id, incrementMins * 4); // 12pm (Simultaneous)
+
+        // POOL C (4 Teams): 8, 9, 10, 11, and two at 12pm
+        addMatch(pC, teamsC[0].id, teamsC[2].id, teamsC[1].id, 0);
+        addMatch(pC, teamsC[1].id, teamsC[3].id, teamsC[0].id, incrementMins);
+        addMatch(pC, teamsC[0].id, teamsC[3].id, teamsC[2].id, incrementMins * 2);
+        addMatch(pC, teamsC[1].id, teamsC[2].id, teamsC[0].id, incrementMins * 3);
+        addMatch(pC, teamsC[2].id, teamsC[3].id, teamsC[1].id, incrementMins * 4); // 12pm
+        addMatch(pC, teamsC[0].id, teamsC[1].id, teamsC[3].id, incrementMins * 4); // 12pm (Simultaneous)
+
+        // POOL D (3 Teams): 8am, 9am, 10am
+        addMatch(pD, teamsD[0].id, teamsD[2].id, teamsD[1].id, 0);
+        addMatch(pD, teamsD[1].id, teamsD[2].id, teamsD[0].id, incrementMins);
+        addMatch(pD, teamsD[0].id, teamsD[1].id, teamsD[2].id, incrementMins * 2);
+        
+    } else {
+        alert("This auto-generator is currently locked to the 14-team format.");
         return;
     }
 
@@ -208,12 +211,44 @@ function renderMatchGrid(matches) {
 
     const allTeams = getTeams();
     const allPools = getPools(); 
+    const allStandings = typeof getAllPoolStandings === 'function' ? getAllPoolStandings() : {};
+
+    // Smart resolver to translate placeholders into real team names
+    const formatSeedRef = (ref) => {
+        if (!ref || !ref.startsWith('seed:')) return null;
+        const parts = ref.split(':');
+        const poolId = parts[1];
+        const rank = parseInt(parts[2], 10);
+        
+        const pStandings = allStandings[poolId] || [];
+        let isComplete = false;
+        if (pStandings.length > 0) {
+            const expectedMatches = pStandings.length === 3 ? 2 : 3;
+            isComplete = pStandings.every(t => t.matchesPlayed >= expectedMatches);
+        }
+        
+        if (isComplete && pStandings[rank - 1]) {
+            return pStandings[rank - 1].name;
+        }
+
+        const poolName = allPools.find(p => p.id === poolId)?.name || 'Pool';
+        const rankStr = rank === 1 ? '1st' : rank === 2 ? '2nd' : rank === 3 ? '3rd' : '4th';
+        return `${rankStr} Place ${poolName}`;
+    };
 
     const getTeamOptions = (selectedId) => {
-        return allTeams.map(t => {
-            const seedText = t.seed ? `(${t.seed}) ` : '';
+        let options = allTeams.map(t => {
+            const seedText = t.seed && t.seed !== 99 ? `(${t.seed}) ` : '';
             return `<option value="${t.id}" ${t.id === selectedId ? 'selected' : ''}>${seedText}${t.name}</option>`;
         }).join('');
+
+        // If the selected ID is a placeholder, inject it as a visible option
+        if (selectedId && selectedId.startsWith('seed:')) {
+            const displayName = formatSeedRef(selectedId);
+            options = `<option value="${selectedId}" selected>⚙️ ${displayName} (Auto)</option>` + options;
+        }
+
+        return options;
     };
 
     const matchesByPool = {};

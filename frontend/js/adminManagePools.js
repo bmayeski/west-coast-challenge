@@ -115,7 +115,9 @@ export function renderAdminPools() {
     
     pools.forEach(pool => {
         const standings = standingsByPool[pool.id] || [];
-        const poolMatches = allMatches.filter(m => m.pool_id === pool.id).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+        const poolMatches = allMatches
+            .filter(m => m.pool_id === pool.id && !(typeof m.teamA === 'string' && m.teamA.startsWith('seed:')))
+            .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
         const headerColor = getSiteColor(pool.site);
         
         const isPoolComplete = poolMatches.length > 0 && poolMatches.every(m => m.status === 'completed' || m.status === 'complete');
@@ -235,85 +237,83 @@ export function renderAdminPools() {
                     </tbody>
                 </table>
 
-                <div style="margin-top: auto;">
-                    <div style="display: flex; flex-direction: column; gap: 8px;">
-                        ${poolMatches.map((m, index) => {
-                            const t1 = teamMap.get(m.teamA);
-                            const t2 = teamMap.get(m.teamB);
-                            const ref = teamMap.get(m.ref);
-                            
-                            const t1Name = t1 ? t1.name : 'TBD';
-                            const t2Name = t2 ? t2.name : 'TBD';
-                            const refName = ref ? ref.name : 'TBD';
-                            
-                            const isComplete = (m.status === 'completed' || m.status === 'complete');
-                            const isNextMatch = (index === nextMatchIndex);
-                            
-                            const s1a = m.s1A !== null && m.s1A !== undefined ? m.s1A : '-';
-                            const s1b = m.s1B !== null && m.s1B !== undefined ? m.s1B : '-';
-                            const s2a = m.s2A !== null && m.s2A !== undefined ? m.s2A : '-';
-                            const s2b = m.s2B !== null && m.s2B !== undefined ? m.s2B : '-';
-                            const s3a = m.s3A !== null && m.s3A !== undefined ? m.s3A : '-';
-                            const s3b = m.s3B !== null && m.s3B !== undefined ? m.s3B : '-';
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    ${poolMatches.map((m, index) => {
+                        const t1 = teamMap.get(m.teamA);
+                        const t2 = teamMap.get(m.teamB);
+                        const ref = teamMap.get(m.ref);
+                        
+                        const t1Name = t1 ? t1.name : 'TBD';
+                        const t2Name = t2 ? t2.name : 'TBD';
+                        const refName = ref ? ref.name : 'TBD';
+                        
+                        const isComplete = (m.status === 'completed' || m.status === 'complete');
+                        const isNextMatch = (index === nextMatchIndex);
+                        
+                        const s1a = m.s1A !== null && m.s1A !== undefined ? m.s1A : '-';
+                        const s1b = m.s1B !== null && m.s1B !== undefined ? m.s1B : '-';
+                        const s2a = m.s2A !== null && m.s2A !== undefined ? m.s2A : '-';
+                        const s2b = m.s2B !== null && m.s2B !== undefined ? m.s2B : '-';
+                        const s3a = m.s3A !== null && m.s3A !== undefined ? m.s3A : '-';
+                        const s3b = m.s3B !== null && m.s3B !== undefined ? m.s3B : '-';
 
-                            const hasScores = (s1a !== '-' || s1b !== '-' || s2a !== '-' || s2b !== '-' || s3a !== '-' || s3b !== '-');
+                        const hasScores = (s1a !== '-' || s1b !== '-' || s2a !== '-' || s2b !== '-' || s3a !== '-' || s3b !== '-');
 
-                            let t1Sets = 0;
-                            let t2Sets = 0;
-                            if (s1a !== '-' && s1b !== '-') { if (Number(s1a) > Number(s1b)) t1Sets++; else if (Number(s1b) > Number(s1a)) t2Sets++; }
-                            if (s2a !== '-' && s2b !== '-') { if (Number(s2a) > Number(s2b)) t1Sets++; else if (Number(s2b) > Number(s2a)) t2Sets++; }
-                            if (s3a !== '-' && s3b !== '-') { if (Number(s3a) > Number(s3b)) t1Sets++; else if (Number(s3b) > Number(s3a)) t2Sets++; }
-                            
-                            const t1Winner = isComplete && t1Sets > t2Sets;
-                            const t2Winner = isComplete && t2Sets > t1Sets;
+                        let t1Sets = 0;
+                        let t2Sets = 0;
+                        if (s1a !== '-' && s1b !== '-') { if (Number(s1a) > Number(s1b)) t1Sets++; else if (Number(s1b) > Number(s1a)) t2Sets++; }
+                        if (s2a !== '-' && s2b !== '-') { if (Number(s2a) > Number(s2b)) t1Sets++; else if (Number(s2b) > Number(s2a)) t2Sets++; }
+                        if (s3a !== '-' && s3b !== '-') { if (Number(s3a) > Number(s3b)) t1Sets++; else if (Number(s3b) > Number(s3a)) t2Sets++; }
+                        
+                        const t1Winner = isComplete && t1Sets > t2Sets;
+                        const t2Winner = isComplete && t2Sets > t1Sets;
 
-                            const t1Style = t1Winner ? 'color: #fff; font-weight: 700;' : 'color: var(--text-secondary); font-weight: normal;';
-                            const t2Style = t2Winner ? 'color: #fff; font-weight: 700;' : 'color: var(--text-secondary); font-weight: normal;';
+                        const t1Style = t1Winner ? 'color: #fff; font-weight: 700;' : 'color: var(--text-secondary); font-weight: normal;';
+                        const t2Style = t2Winner ? 'color: #fff; font-weight: 700;' : 'color: var(--text-secondary); font-weight: normal;';
 
-                            let statusBadge = '';
-                            if (isComplete) {
-                                statusBadge = `<span title="Completed" style="color: #22c55e; font-weight: 900; font-size: 0.8rem;">✔</span>`;
-                            } else if (hasScores || isNextMatch) {
-                                statusBadge = `<span title="In Progress" style="color: var(--accent-orange); font-weight: 900; font-size: 0.75rem;">▶</span>`;
-                            } else {
-                                statusBadge = `<span title="Scheduled" style="color: #64748b; font-weight: 900; font-size: 0.9rem;">-</span>`;
-                            }
+                        let statusBadge = '';
+                        if (isComplete) {
+                            statusBadge = `<span title="Completed" style="color: #22c55e; font-weight: 900; font-size: 0.8rem;">✔</span>`;
+                        } else if (hasScores || isNextMatch) {
+                            statusBadge = `<span title="In Progress" style="color: var(--accent-orange); font-weight: 900; font-size: 0.75rem;">▶</span>`;
+                        } else {
+                            statusBadge = `<span title="Scheduled" style="color: #64748b; font-weight: 900; font-size: 0.9rem;">-</span>`;
+                        }
 
-                            return `
-                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; background: rgba(255,255,255,0.02); padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
-                                <div style="display: flex; flex-direction: column; flex-grow: 1; min-width: 0; padding-right: 10px;">
-                                    <div style="font-size: 0.9rem; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                        <span style="${t1Style}">${t1Name}</span> <span style="color: var(--text-secondary); font-size: 0.75rem; font-weight: normal; margin: 0 5px;">vs</span> <span style="${t2Style}">${t2Name}</span>
-                                    </div>
-                                    <div style="font-size: 0.7rem; color: var(--text-secondary); display: flex; align-items: center; gap: 8px;">
-                                        <span style="color: var(--accent-orange); font-weight: bold; flex-shrink: 0;">${formatTime(m.time)}</span>
-                                        <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-grow: 1;">Ref: ${refName}</span>
-                                        <div style="width: 20px; text-align: right; flex-shrink: 0;">${statusBadge}</div>
-                                    </div>
+                        return `
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; background: rgba(255,255,255,0.02); padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
+                            <div style="display: flex; flex-direction: column; flex-grow: 1; min-width: 0; padding-right: 10px;">
+                                <div style="font-size: 0.9rem; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                    <span style="${t1Style}">${t1Name}</span> <span style="color: var(--text-secondary); font-size: 0.75rem; font-weight: normal; margin: 0 5px;">vs</span> <span style="${t2Style}">${t2Name}</span>
                                 </div>
-                                
-                                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; min-width: 110px;">
-                                    <div style="display: flex; gap: 6px; text-align: center; font-size: 0.75rem; color: var(--text-secondary); justify-content: flex-end; width: 100%;">
-                                        <div style="width: 34px; background: rgba(0,0,0,0.2); border-radius: 3px; padding: 2px 0;">${s1a}-${s1b}</div>
-                                        <div style="width: 34px; background: rgba(0,0,0,0.2); border-radius: 3px; padding: 2px 0;">${s2a}-${s2b}</div>
-                                        <div style="width: 34px; background: rgba(0,0,0,0.2); border-radius: 3px; padding: 2px 0;">${s3a}-${s3b}</div>
-                                    </div>
-                                    <div style="display: flex; gap: 4px; width: 100%;">
-                                        <button class="btn edit-pool-details-btn" 
-                                            data-match-id="${m.id}" 
-                                            data-t1="${t1Name}" 
-                                            data-t2="${t2Name}" 
-                                            data-time="${m.time ? m.time : ''}" 
-                                            data-court="${m.court ? m.court : ''}" 
-                                            data-ref="${m.ref ? m.ref : ''}" 
-                                            style="font-size: 0.9rem; padding: 3px 8px; background: var(--surface-light); border: 1px solid var(--border-color); color: white; cursor: pointer; border-radius: 4px; display: flex; align-items: center; justify-content: center;" title="Edit Match Details">⚙️</button>
-                                        <button class="btn edit-score-admin-btn" data-match-id="${m.id}" style="font-size: 0.65rem; padding: 3px; background: var(--surface-light); border: 1px solid var(--border-color); color: white; cursor: pointer; border-radius: 4px; flex-grow: 1;">Edit Scores</button>
-                                    </div>
+                                <div style="font-size: 0.7rem; color: var(--text-secondary); display: flex; align-items: center; gap: 8px;">
+                                    <span style="color: var(--accent-orange); font-weight: bold; flex-shrink: 0;">${formatTime(m.time)}</span>
+                                    <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-grow: 1;">Ref: ${refName}</span>
+                                    <div style="width: 20px; text-align: right; flex-shrink: 0;">${statusBadge}</div>
                                 </div>
                             </div>
-                            `;
-                        }).join('')}
-                    </div>
+                            
+                            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; min-width: 110px;">
+                                <div style="display: flex; gap: 6px; text-align: center; font-size: 0.75rem; color: var(--text-secondary); justify-content: flex-end; width: 100%;">
+                                    <div style="width: 34px; background: rgba(0,0,0,0.2); border-radius: 3px; padding: 2px 0;">${s1a}-${s1b}</div>
+                                    <div style="width: 34px; background: rgba(0,0,0,0.2); border-radius: 3px; padding: 2px 0;">${s2a}-${s2b}</div>
+                                    <div style="width: 34px; background: rgba(0,0,0,0.2); border-radius: 3px; padding: 2px 0;">${s3a}-${s3b}</div>
+                                </div>
+                                <div style="display: flex; gap: 4px; width: 100%;">
+                                    <button class="btn edit-pool-details-btn" 
+                                        data-match-id="${m.id}" 
+                                        data-t1="${t1Name}" 
+                                        data-t2="${t2Name}" 
+                                        data-time="${m.time ? m.time : ''}" 
+                                        data-court="${m.court ? m.court : ''}" 
+                                        data-ref="${m.ref ? m.ref : ''}" 
+                                        style="font-size: 0.9rem; padding: 3px 8px; background: var(--surface-light); border: 1px solid var(--border-color); color: white; cursor: pointer; border-radius: 4px; display: flex; align-items: center; justify-content: center;" title="Edit Match Details">⚙️</button>
+                                    <button class="btn edit-score-admin-btn" data-match-id="${m.id}" style="font-size: 0.65rem; padding: 3px; background: var(--surface-light); border: 1px solid var(--border-color); color: white; cursor: pointer; border-radius: 4px; flex-grow: 1;">Edit Scores</button>
+                                </div>
+                            </div>
+                        </div>
+                        `;
+                    }).join('')}
                 </div>
             </div>
         </div>
@@ -508,17 +508,19 @@ export function printPoolSheets() {
             .page { page-break-after: always; display: flex; flex-direction: column; min-height: 95vh; box-sizing: border-box; }
             .page:last-child { page-break-after: auto; }
             
-            .header { margin-bottom: 15px; border-bottom: 2px solid #64748b; padding-bottom: 10px; text-align: center; }
-            .header h1 { margin: 0; font-size: 28px; font-weight: 900; text-transform: uppercase; color: #000; }
+            /* REDUCED: Header margins */
+            .header { margin-bottom: 8px; border-bottom: 2px solid #64748b; padding-bottom: 6px; text-align: center; }
+            .header h1 { margin: 0; font-size: 26px; font-weight: 900; text-transform: uppercase; color: #000; }
             
-            table.standings-table { width: 80%; margin: 0 auto 35px auto; border-collapse: separate; border-spacing: 0; border: 2px solid #64748b; border-radius: 8px; }
-            table.standings-table th, table.standings-table td { border-right: 1px solid #94a3b8; border-bottom: 1px solid #94a3b8; padding: 8px 12px; text-align: center; font-size: 16px; }
+            /* REDUCED: Table margins and cell padding */
+            table.standings-table { width: 80%; margin: 0 auto 15px auto; border-collapse: separate; border-spacing: 0; border: 2px solid #64748b; border-radius: 8px; }
+            table.standings-table th, table.standings-table td { border-right: 1px solid #94a3b8; border-bottom: 1px solid #94a3b8; padding: 5px 10px; text-align: center; font-size: 15px; }
             table.standings-table th:last-child, table.standings-table td:last-child { border-right: none; }
             table.standings-table tr:last-child td { border-bottom: none; }
             
             table.standings-table th { text-transform: uppercase; font-weight: bold; background-color: transparent; color: #334155; }
-            table.standings-table td.team-name { text-align: left; font-weight: bold; width: 40%; font-size: 18px; color: #0f172a; }
-            table.standings-table td.team-rank { font-weight: 900; color: #475569; width: 30px; font-size: 18px; }
+            table.standings-table td.team-name { text-align: left; font-weight: bold; width: 40%; font-size: 17px; color: #0f172a; }
+            table.standings-table td.team-rank { font-weight: 900; color: #475569; width: 30px; font-size: 17px; }
             
             .placement-badge { display: inline-block; width: 36px; text-align: center; padding: 2px 0; border-radius: 4px; font-size: 13px; font-weight: 900; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .badge-1st { background-color: #fbbf24 !important; color: #000 !important; }
@@ -528,30 +530,30 @@ export function printPoolSheets() {
             .badge-other { background-color: #0f172a !important; color: #fff !important; }
             
             .pool-info-cell { vertical-align: middle; border-top-left-radius: 8px; }
-            .location-name { font-size: 13px; font-weight: bold; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; color: #475569; }
-            .pool-badge { display: inline-block; padding: 4px 16px; color: #fff !important; font-size: 18px; font-weight: bold; border-radius: 6px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .location-name { font-size: 13px; font-weight: bold; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 1px; color: #475569; }
+            .pool-badge { display: inline-block; padding: 3px 14px; color: #fff !important; font-size: 17px; font-weight: bold; border-radius: 6px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             
-            .matches-wrapper { width: 75%; margin: 0 auto 20px auto; display: flex; flex-direction: column; gap: 12px; }
-            .match-row { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 6px 15px; border: 2px solid #cbd5e1; border-radius: 8px; }
+            /* REDUCED: Match gap spacing, row padding, and score box heights */
+            .matches-wrapper { width: 75%; margin: 0 auto 10px auto; display: flex; flex-direction: column; gap: 8px; }
+            .match-row { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 5px 15px; border: 2px solid #cbd5e1; border-radius: 8px; }
             
             .time-badge { position: absolute; top: -9px; left: 15px; background: #fff; color: #64748b; font-size: 10px; font-weight: 800; padding: 0 6px; letter-spacing: 0.5px; }
             
-            /* ADJUSTED: Expanded width to 320px to easily fit cross-over text */
-            .match-info { font-weight: bold; font-size: 16px; display: flex; align-items: center; gap: 8px; width: 320px; flex-shrink: 0; color: #0f172a; }
+            .match-info { font-weight: bold; font-size: 15px; display: flex; align-items: center; gap: 8px; width: 320px; flex-shrink: 0; color: #0f172a; }
             .match-num { width: 70px; display: inline-block; color: #475569; }
-            .ref-info { font-weight: normal; font-size: 14px; font-style: italic; color: #64748b; margin-left: auto; }
+            .ref-info { font-weight: normal; font-size: 13px; font-style: italic; color: #64748b; margin-left: auto; }
             
-            /* ADJUSTED: Added min-width and padding so it expands for "3rd A" gracefully */
-            .seed-badge { display: inline-block; min-width: 22px; height: 22px; line-height: 22px; padding: 0 4px; text-align: center; border-radius: 4px; font-weight: 900; color: #475569; white-space: nowrap; box-sizing: border-box; }
+            .seed-badge { display: inline-block; min-width: 20px; height: 20px; line-height: 20px; padding: 0 4px; text-align: center; border-radius: 4px; font-weight: 900; color: #475569; white-space: nowrap; box-sizing: border-box; }
             .winner-seed { background-color: #cbd5e1 !important; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             
-            .game-boxes { display: flex; gap: 20px; flex-grow: 1; justify-content: flex-end; }
-            .game-box-group { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: bold; color: #475569; }
-            .box { width: 36px; height: 26px; border: 2px solid #94a3b8; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #0f172a; font-weight: bold; }
+            .game-boxes { display: flex; gap: 16px; flex-grow: 1; justify-content: flex-end; }
+            .game-box-group { display: flex; align-items: center; gap: 5px; font-size: 13px; font-weight: bold; color: #475569; }
+            .box { width: 32px; height: 22px; border: 2px solid #94a3b8; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #0f172a; font-weight: bold; }
             
-            .footer { padding-top: 10px; font-size: 15px; font-style: italic; text-align: center; border-top: 2px dashed #94a3b8; margin-top: auto; color: #334155; }
-            .footer-primary { font-weight: bold; margin-bottom: 4px; }
-            .footer-disclaimer { font-size: 13px; font-weight: 600; color: #64748b; }
+            /* REDUCED: Footer padding */
+            .footer { padding-top: 6px; font-size: 14px; font-style: italic; text-align: center; border-top: 2px dashed #94a3b8; margin-top: auto; color: #334155; }
+            .footer-primary { font-weight: bold; margin-bottom: 2px; }
+            .footer-disclaimer { font-size: 12px; font-weight: 600; color: #64748b; }
         </style>
     </head>
     <body>
@@ -562,14 +564,16 @@ export function printPoolSheets() {
         let poolAdvancementText = "";
         const pName = (pool.name || '').toUpperCase();
         if (pName.includes('A') || pName.includes('B')) {
-            poolAdvancementText = "1st & 2nd advance to Gold. 3rd Pool B auto-advances to Silver. 3rd Pool A plays 4th Pool B for Silver.";
+            poolAdvancementText = "1st & 2nd advance to Gold. 3rd Pool B auto-advances. 3rd A plays 4th B for Silver.";
         } else {
-            poolAdvancementText = "1st & 2nd play Crossover for Gold. 3rd Pool C plays 4th Pool D for Silver.";
+            poolAdvancementText = "1st & 2nd play Crossover for Gold. 3rd Pool C auto-advances. 4th C plays 3rd D for Silver.";
         }
 
         const poolTeams = allTeams.filter(t => t.pool_id === pool.id).sort((a, b) => a.seed - b.seed);
         const siteColor = getSiteColor(pool.site);
-        const poolMatches = allMatches.filter(m => m.pool_id === pool.id).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+        const poolMatches = allMatches
+            .filter(m => m.pool_id === pool.id && !(typeof m.teamA === 'string' && m.teamA.startsWith('seed:')))
+            .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
         
         // Calculate Pool Stats Inline
         const teamStats = {};

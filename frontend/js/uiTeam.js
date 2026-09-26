@@ -74,6 +74,8 @@ export function renderMyTeam(teamId) {
     // 1. CALCULATE POOL RECORD
     let poolMatchWins = 0, poolMatchLosses = 0, poolSetWins = 0, poolSetLosses = 0;
     let poolName = 'Unknown Pool';
+    
+    // --- NEW: Fix to dynamically pull the specific pool site ---
     let location = tournamentData?.location || 'TBD';
 
     let myStanding = null;
@@ -84,7 +86,8 @@ export function renderMyTeam(teamId) {
             const p = pools.find(pool => pool.id === pId);
             if (p) {
                 poolName = p.name;
-                location = p.location || location;
+                // Grab the 'site' property from the pool data, otherwise fallback
+                location = p.site || p.location || location;
             }
             break;
         }

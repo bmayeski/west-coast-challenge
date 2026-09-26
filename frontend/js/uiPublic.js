@@ -126,11 +126,36 @@ export function renderPublicPools() {
         return;
     }
 
+    // --- NEW: Smart Name Resolver for Public View ---
+    const formatSeedRef = (ref) => {
+        if (!ref || !ref.startsWith('seed:')) return null;
+        const parts = ref.split(':');
+        const poolId = parts[1];
+        const rank = parseInt(parts[2], 10);
+        
+        const pStandings = standingsByPool[poolId] || [];
+        let isComplete = false;
+        if (pStandings.length > 0) {
+            const expectedMatches = pStandings.length === 3 ? 2 : 3;
+            isComplete = pStandings.every(t => t.matchesPlayed >= expectedMatches);
+        }
+        
+        if (isComplete && pStandings[rank - 1]) {
+            return pStandings[rank - 1].name;
+        }
+
+        const poolName = allPools.find(p => p.id === poolId)?.name || 'Pool';
+        const rankStr = rank === 1 ? '1st' : rank === 2 ? '2nd' : rank === 3 ? '3rd' : '4th';
+        return `${rankStr} Place ${poolName}`;
+    };
+
     let html = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 15px;">';
     
     pools.forEach(pool => {
         const standings = standingsByPool[pool.id] || [];
-        const poolMatches = allMatches.filter(m => m.pool_id === pool.id).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+        const poolMatches = allMatches
+            .filter(m => m.pool_id === pool.id && !(typeof m.teamA === 'string' && m.teamA.startsWith('seed:')))
+            .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
         
         // Map the pool's site to the tournament's specific bracket config colors
         let headerColor = 'var(--accent-orange)';
@@ -142,6 +167,9 @@ export function renderPublicPools() {
         const maxMatches = standings.length > 0 ? standings.length - 1 : 0; 
 
         const nextMatchIndex = poolMatches.findIndex(m => m.status !== 'completed' && m.status !== 'complete');
+        
+        // NEW: Divider Tracker (Resets for each pool)
+        let crossPlayShown = false;
 
         html += `
         <div style="background: var(--surface-dark); border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); display: flex; flex-direction: column;">
@@ -255,7 +283,7 @@ export function renderPublicPools() {
                     </tbody>
                 </table>
 
-                <div style="margin-top: auto; display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: flex; flex-direction: column; gap: 8px;">
                     <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); padding-bottom: 4px; margin-bottom: 2px;">
                         <div style="display: flex; align-items: baseline; gap: 10px; min-width: 0;">
                             <span style="white-space: nowrap;">Match Breakdown</span>
@@ -274,9 +302,10 @@ export function renderPublicPools() {
                             const t2 = teamMap.get(m.teamB);
                             const ref = teamMap.get(m.ref);
                             
-                            const t1Name = t1 ? t1.name : 'TBD';
-                            const t2Name = t2 ? t2.name : 'TBD';
-                            const refName = ref ? ref.name : 'TBD';
+                            // NEW: Use the smart resolver here too
+                            const t1Name = t1 ? t1.name : (formatSeedRef(m.teamA) || 'TBD');
+                            const t2Name = t2 ? t2.name : (formatSeedRef(m.teamB) || 'TBD');
+                            const refName = ref ? ref.name : (formatSeedRef(m.ref) || 'TBD');
                             
                             const isComplete = (m.status === 'completed' || m.status === 'complete');
                             const isNextMatch = (index === nextMatchIndex);
@@ -350,7 +379,19 @@ export function renderPublicPools() {
                             const cardLeftBorder = isActive ? '4px solid var(--accent-orange)' : '4px solid #334155';
                             const cardShadow = isActive ? '0 4px 15px rgba(0,0,0,0.5)' : 'none';
 
+                            // NEW: Inject the Cross-Play divider
+                            let dividerHtml = '';
+                            if (!crossPlayShown && typeof m.teamA === 'string' && m.teamA.startsWith('seed:')) {
+                                crossPlayShown = true;
+                                dividerHtml = `
+                                <div style="text-align: center; margin: 10px 0 5px 0; position: relative;">
+                                    <div style="position: absolute; top: 50%; left: 0; right: 0; border-top: 1px dashed rgba(255,255,255,0.1);"></div>
+                                    <span style="background: var(--surface-dark); padding: 0 10px; color: #0284c7; font-size: 0.65rem; font-weight: 800; letter-spacing: 1px; position: relative; z-index: 1;">CROSS-PLAY MATCHES</span>
+                                </div>`;
+                            }
+
                             return `
+                            ${dividerHtml}
                             <div style="background: ${cardBg}; border-radius: 8px; border:${cardBorder}; border-left: ${cardLeftBorder}; padding: 10px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; box-shadow:${cardShadow};">
                                 <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
                                     <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
