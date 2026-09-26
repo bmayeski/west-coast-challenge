@@ -433,7 +433,6 @@ export function printPoolSheets() {
         try { config = JSON.parse(config); } catch(e) {}
     }
     
-    const activeDivisions = config.divisions || '2';
     const poolStart = config.poolStartTime || tournamentData?.start_time || '08:00';
     const poolDur = parseInt(config.poolDuration || '60', 10);
 
@@ -469,17 +468,31 @@ export function printPoolSheets() {
         return n + 'th';
     };
     
-    let advancementText = "1st and 2nd advance to Gold Division &nbsp;&nbsp;|&nbsp;&nbsp; 3rd and 4th advance to Silver Division";
-    if (activeDivisions === '3') {
-        advancementText = "1st and 2nd advance to Gold &nbsp;&nbsp;|&nbsp;&nbsp; 3rd advances to Silver &nbsp;&nbsp;|&nbsp;&nbsp; 4th advances to Bronze";
-    }
-    
     const getSiteColor = (siteName) => {
         if (!siteName) return '#475569'; 
         if (siteName === config.site1Name) return config.site1Color || '#3b82f6';
         if (siteName === config.site2Name) return config.site2Color || '#ef4444';
         if (siteName === config.site3Name) return config.site3Color || '#22c55e';
         return '#475569';
+    };
+
+    // --- NEW: Helper to translate "seed:poolC:3" into "3rd C" on paper ---
+    const formatSeedPrint = (refStr) => {
+        if (!refStr) return '?';
+        if (typeof refStr === 'string' && refStr.startsWith('seed:')) {
+            const parts = refStr.split(':');
+            const poolObj = pools.find(p => p.id === parts[1]);
+            const pName = poolObj ? poolObj.name.replace('Pool ', '') : '';
+            const r = parseInt(parts[2], 10);
+            const rStr = r === 1 ? '1st' : r === 2 ? '2nd' : r === 3 ? '3rd' : r === 4 ? '4th' : r;
+            return `${rStr} ${pName}`;
+        }
+        
+        // Fallback for real teams reffing out of their own pool
+        const realTeam = allTeams.find(t => t.id === refStr);
+        if (realTeam) return realTeam.seed || '?';
+
+        return '?';
     };
 
     const printWin = window.open('', '_blank');
@@ -507,7 +520,6 @@ export function printPoolSheets() {
             table.standings-table td.team-name { text-align: left; font-weight: bold; width: 40%; font-size: 18px; color: #0f172a; }
             table.standings-table td.team-rank { font-weight: 900; color: #475569; width: 30px; font-size: 18px; }
             
-            /* Podium Colors and Uniform Width for Placement Badges */
             .placement-badge { display: inline-block; width: 36px; text-align: center; padding: 2px 0; border-radius: 4px; font-size: 13px; font-weight: 900; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .badge-1st { background-color: #fbbf24 !important; color: #000 !important; }
             .badge-2nd { background-color: #cbd5e1 !important; color: #000 !important; }
@@ -524,11 +536,13 @@ export function printPoolSheets() {
             
             .time-badge { position: absolute; top: -9px; left: 15px; background: #fff; color: #64748b; font-size: 10px; font-weight: 800; padding: 0 6px; letter-spacing: 0.5px; }
             
-            .match-info { font-weight: bold; font-size: 16px; display: flex; align-items: center; gap: 8px; width: 280px; flex-shrink: 0; color: #0f172a; }
+            /* ADJUSTED: Expanded width to 320px to easily fit cross-over text */
+            .match-info { font-weight: bold; font-size: 16px; display: flex; align-items: center; gap: 8px; width: 320px; flex-shrink: 0; color: #0f172a; }
             .match-num { width: 70px; display: inline-block; color: #475569; }
             .ref-info { font-weight: normal; font-size: 14px; font-style: italic; color: #64748b; margin-left: auto; }
             
-            .seed-badge { display: inline-block; width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 4px; font-weight: 900; color: #475569; }
+            /* ADJUSTED: Added min-width and padding so it expands for "3rd A" gracefully */
+            .seed-badge { display: inline-block; min-width: 22px; height: 22px; line-height: 22px; padding: 0 4px; text-align: center; border-radius: 4px; font-weight: 900; color: #475569; white-space: nowrap; box-sizing: border-box; }
             .winner-seed { background-color: #cbd5e1 !important; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             
             .game-boxes { display: flex; gap: 20px; flex-grow: 1; justify-content: flex-end; }
@@ -544,6 +558,15 @@ export function printPoolSheets() {
     `;
 
     pools.forEach(pool => {
+        // --- NEW: Dynamic Advancement Text based on Location ---
+        let poolAdvancementText = "";
+        const pName = (pool.name || '').toUpperCase();
+        if (pName.includes('A') || pName.includes('B')) {
+            poolAdvancementText = "1st & 2nd advance to Gold. 3rd Pool B auto-advances to Silver. 3rd Pool A plays 4th Pool B for Silver.";
+        } else {
+            poolAdvancementText = "1st & 2nd play Crossover for Gold. 3rd Pool C plays 4th Pool D for Silver.";
+        }
+
         const poolTeams = allTeams.filter(t => t.pool_id === pool.id).sort((a, b) => a.seed - b.seed);
         const siteColor = getSiteColor(pool.site);
         const poolMatches = allMatches.filter(m => m.pool_id === pool.id).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
@@ -586,7 +609,6 @@ export function printPoolSheets() {
         
         const isFinished = poolMatches.length > 0 && matchesPlayed === poolMatches.length;
         
-        // Convert to array and sort to determine placement rankings
         let sortedStandings = Object.values(teamStats).sort((a, b) => {
             if (b.mw !== a.mw) return b.mw - a.mw;
             if (b.sw !== a.sw) return b.sw - a.sw;
@@ -594,12 +616,10 @@ export function printPoolSheets() {
             return a.seed - b.seed;
         });
         
-        // Attach placement rank to the teamStats object
         sortedStandings.forEach((s, i) => {
             teamStats[s.id].rank = i + 1;
         });
         
-        // ALWAYS display teams ordered by their original seed
         const displayTeams = poolTeams.map(t => teamStats[t.id]);
         
         html += `
@@ -667,9 +687,10 @@ export function printPoolSheets() {
                     const tB = poolTeams.find(t => t.id === ms.teamB);
                     const refTeam = poolTeams.find(t => t.id === ms.ref);
                     
-                    const seedA = tA ? tA.seed : '?';
-                    const seedB = tB ? tB.seed : '?';
-                    const refSeed = refTeam ? refTeam.seed : '?';
+                    // --- NEW: Use formatSeedPrint for Crossover Matches ---
+                    const seedA = tA ? tA.seed : formatSeedPrint(ms.teamA);
+                    const seedB = tB ? tB.seed : formatSeedPrint(ms.teamB);
+                    const refSeed = refTeam ? refTeam.seed : formatSeedPrint(ms.ref);
                     
                     const s1A = parseInt(ms.s1A, 10) || 0;
                     const s1B = parseInt(ms.s1B, 10) || 0;
@@ -717,7 +738,7 @@ export function printPoolSheets() {
 
         html += `
             <div class="footer">
-                <div class="footer-primary">${advancementText}</div>
+                <div class="footer-primary">${poolAdvancementText}</div>
                 <div class="footer-disclaimer">* Times are estimates. Matches start when courts clear.</div>
             </div>
         </div>
