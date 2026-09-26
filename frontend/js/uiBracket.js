@@ -200,31 +200,38 @@ export function renderCanvas(canvasId, selectId, isAdmin) {
     } else if (selectedDivision === 'silver') {
         const totalTeams = getTeams().length;
         
-        if (totalTeams === 13) {
+        if (totalTeams === 12) {
             bracketData = [
-                // 13-Team Format (5 Silver Teams: 1 Play-in, 3 Byes)
+                // 12-Team Format (4 Silver Teams: 2 Semifinals, 1 Final)
+                { col: 'Semifinals', rawTime: t0, id: 'S1', t1: `seed:${pA}:3`, t2: `seed:${pB}:3`, ref: `seed:${pA}:1` },
+                { col: 'Semifinals', rawTime: t0, id: 'S2', t1: `seed:${pC}:3`, t2: `seed:${pD}:3`, ref: `seed:${pD}:1` },
+                
+                { col: 'Finals', rawTime: t1, id: 'S3', t1: `winner:S1`, t2: `winner:S2`, ref: `loser:S1` }
+            ];
+        } else if (totalTeams === 13) {
+            bracketData = [
+                // 13-Team Format (5 Silver Teams)
                 { col: 'Quarterfinals', rawTime: t0, id: 'S1', t1: `seed:${pA}:3`, t2: `seed:${pB}:4`, ref: `loser:G1` },
                 { col: 'Quarterfinals', rawTime: t0, id: 'S_Bye1', t1: `seed:${pC}:3`, t2: `BYE`, isBye: true, feedsTo: 'S3', site: pC_site },
-                
                 { col: 'Quarterfinals', rawTime: t0, id: 'S_Bye2', t1: `seed:${pD}:3`, t2: `BYE`, isBye: true, feedsTo: 'S4', site: pC_site },
                 { col: 'Quarterfinals', rawTime: t0, id: 'S_Bye3', t1: `seed:${pB}:3`, t2: `BYE`, isBye: true, feedsTo: 'S4', site: pB_site },
 
-                // Semifinals
                 { col: 'Semifinals', rawTime: t1, id: 'S3', t1: `winner:S1`, t2: `seed:${pC}:3`, ref: `loser:S1` },
                 { col: 'Semifinals', rawTime: t1, id: 'S4', t1: `seed:${pD}:3`, t2: `seed:${pB}:3`, ref: `loser:G3` },
 
-                // Finals
                 { col: 'Finals', rawTime: t2, id: 'S5', t1: `winner:S3`, t2: `winner:S4`, ref: `loser:S3` }
             ];
         } else {
             bracketData = [
-                // 14-Team Format
+                // 14-Team Format (6 Silver Teams)
                 { col: 'Quarterfinals', rawTime: t0, id: 'S1', t1: `seed:${pA}:3`, t2: `seed:${pB}:4`, ref: `loser:G1` },
                 { col: 'Quarterfinals', rawTime: t0, id: 'S_Bye1', t1: `seed:${pC}:3`, t2: `BYE`, isBye: true, feedsTo: 'S3', site: pC_site },
                 { col: 'Quarterfinals', rawTime: t0, id: 'S2', t1: `seed:${pC}:4`, t2: `seed:${pD}:3`, ref: `loser:G3` },
                 { col: 'Quarterfinals', rawTime: t0, id: 'S_Bye2', t1: `seed:${pB}:3`, t2: `BYE`, isBye: true, feedsTo: 'S4', site: pB_site },
+                
                 { col: 'Semifinals', rawTime: t1, id: 'S3', t1: `winner:S1`, t2: `seed:${pC}:3`, ref: `loser:S1` },
                 { col: 'Semifinals', rawTime: t1, id: 'S4', t1: `winner:S2`, t2: `seed:${pB}:3`, ref: `loser:S2` },
+                
                 { col: 'Finals', rawTime: t2, id: 'S5', t1: `winner:S3`, t2: `winner:S4`, ref: `loser:S3` }
             ];
         }
@@ -1175,7 +1182,13 @@ export function printBrackets() {
             ];
         } else if (div === 'Silver') {
             const totalTeams = allTeams.length;
-            if (totalTeams === 13) {
+            if (totalTeams === 12) {
+                bracketData = [
+                    { col: 'Semifinals', rawTime: t0, id: 'S1', t1: `seed:${pA}:3`, t2: `seed:${pB}:3`, ref: `seed:${pA}:1` },
+                    { col: 'Semifinals', rawTime: t0, id: 'S2', t1: `seed:${pC}:3`, t2: `seed:${pD}:3`, ref: `seed:${pD}:1` },
+                    { col: 'Finals', rawTime: t1, id: 'S3', t1: `winner:S1`, t2: `winner:S2`, ref: `loser:S1` }
+                ];
+            } else if (totalTeams === 13) {
                 bracketData = [
                     { col: 'Quarterfinals', rawTime: t0, id: 'S1', t1: `seed:${pA}:3`, t2: `seed:${pB}:4`, ref: `loser:G1` },
                     { col: 'Quarterfinals', rawTime: t0, id: 'S_Bye1', t1: `seed:${pC}:3`, t2: `BYE`, isBye: true, feedsTo: 'S3', site: pC_site },
@@ -1445,7 +1458,22 @@ export function printBrackets() {
             </div>`;
         } else if (div === 'Silver') {
             const totalTeams = allTeams.length;
-            if (totalTeams === 13) {
+            if (totalTeams === 12) {
+                html += `<div class="col">
+                    <div class="round-title">Semifinals</div>
+                    <div class="pair">
+                        ${renderMatchBox(bracketData.find(m => m.id === 'S1'))}
+                        ${renderMatchBox(bracketData.find(m => m.id === 'S2'))}
+                        <div class="connector"></div><div class="stem"></div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="round-title">Championship</div>
+                    <div class="pair" style="justify-content: center;">
+                        ${renderMatchBox(bracketData.find(m => m.id === 'S3'))}
+                    </div>
+                </div>`;
+            } else if (totalTeams === 13) {
                 html += `<div class="col">
                     <div class="round-title">Quarterfinals</div>
                     <div class="pair">

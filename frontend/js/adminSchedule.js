@@ -143,8 +143,8 @@ function handleAutoGenerate() {
 
     let generatedMatches = [];
 
-    // --- DIRECTOR'S CUSTOM 14-TEAM SCHEDULE (POOL PLAY ONLY) ---
-    if ((assignedTeamsCount === 14 || assignedTeamsCount === 13) && sortedPoolIds.length >= 4) {
+    // --- DIRECTOR'S CUSTOM SCHEDULE (POOL PLAY ONLY) ---
+    if ((assignedTeamsCount === 14 || assignedTeamsCount === 13 || assignedTeamsCount === 12) && sortedPoolIds.length >= 4) {
         const [pA, pB, pC, pD] = sortedPoolIds;
         
         const getSorted = (pid) => poolsMap[pid].sort((a, b) => (parseInt(a.seed) || 99) - (parseInt(b.seed) || 99));
@@ -169,13 +169,19 @@ function handleAutoGenerate() {
         addMatch(pA, teamsA[1].id, teamsA[2].id, teamsA[0].id, incrementMins);
         addMatch(pA, teamsA[0].id, teamsA[1].id, teamsA[2].id, incrementMins * 2);
 
-        // POOL B (4 Teams): 8, 9, 10, 11, and two at 12pm
-        addMatch(pB, teamsB[0].id, teamsB[2].id, teamsB[1].id, 0);
-        addMatch(pB, teamsB[1].id, teamsB[3].id, teamsB[0].id, incrementMins);
-        addMatch(pB, teamsB[0].id, teamsB[3].id, teamsB[2].id, incrementMins * 2);
-        addMatch(pB, teamsB[1].id, teamsB[2].id, teamsB[0].id, incrementMins * 3);
-        addMatch(pB, teamsB[2].id, teamsB[3].id, teamsB[1].id, incrementMins * 4); // 12pm
-        addMatch(pB, teamsB[0].id, teamsB[1].id, teamsB[3].id, incrementMins * 4); // 12pm (Simultaneous)
+        // POOL B (Dynamic 3 or 4 Teams)
+        if (teamsB.length === 3) {
+            addMatch(pB, teamsB[0].id, teamsB[2].id, teamsB[1].id, 0);
+            addMatch(pB, teamsB[1].id, teamsB[2].id, teamsB[0].id, incrementMins);
+            addMatch(pB, teamsB[0].id, teamsB[1].id, teamsB[2].id, incrementMins * 2);
+        } else {
+            addMatch(pB, teamsB[0].id, teamsB[2].id, teamsB[1].id, 0);
+            addMatch(pB, teamsB[1].id, teamsB[3].id, teamsB[0].id, incrementMins);
+            addMatch(pB, teamsB[0].id, teamsB[3].id, teamsB[2].id, incrementMins * 2);
+            addMatch(pB, teamsB[1].id, teamsB[2].id, teamsB[0].id, incrementMins * 3);
+            addMatch(pB, teamsB[2].id, teamsB[3].id, teamsB[1].id, incrementMins * 4); 
+            addMatch(pB, teamsB[0].id, teamsB[1].id, teamsB[3].id, incrementMins * 4); 
+        }
 
         // POOL C (Dynamic 3 or 4 Teams)
         if (teamsC.length === 3) {
